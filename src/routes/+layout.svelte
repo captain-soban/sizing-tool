@@ -1,7 +1,16 @@
 <script lang="ts">
-	import '../app.css';
-
-	let { children } = $props();
+  import '../app.css';
+  import type { Snippet } from 'svelte';
+  
+  interface Props {
+    children: Snippet;
+  }
+  
+  let { children }: Props = $props();
 </script>
 
-{@render children()}
+<div class="min-h-screen">
+  <main>
+    {@render children()}
+  </main>
+</div>
