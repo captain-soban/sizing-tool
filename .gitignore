@@ -27,3 +27,7 @@ vite.config.ts.timestamp-*
 FEATURES.md
 NOTES.md
 .github/copilot-instructions.md
+
+# Claude Code
+CLAUDE.md
+.claude/
