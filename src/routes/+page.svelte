@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { Button } from '$lib/components/ui/button';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
 
 	let sessionCode = $state('');
 	let playerName = $state('');
@@ -29,34 +32,39 @@
 			goto(`/session/${sessionCode.toUpperCase()}`);
 		}
 	}
+
+	function handleSessionCodeInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		sessionCode = target.value.toUpperCase();
+	}
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-	<div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-		<h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Planning Poker</h1>
-		
-		<div class="space-y-6">
-			<div>
-				<label for="playerName" class="block text-sm font-medium text-gray-700 mb-2">
+	<Card class="w-full max-w-md">
+		<CardHeader>
+			<CardTitle class="text-3xl font-bold text-center">Planning Poker</CardTitle>
+		</CardHeader>
+		<CardContent class="space-y-6">
+			<div class="space-y-2">
+				<label for="playerName" class="text-sm font-medium">
 					Your Name
 				</label>
-				<input
+				<Input
 					id="playerName"
 					type="text"
 					bind:value={playerName}
 					placeholder="Enter your name"
-					class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 				/>
 			</div>
 
 			<div class="space-y-4">
-				<button
+				<Button
 					onclick={createSession}
 					disabled={!playerName.trim()}
-					class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+					class="w-full"
 				>
 					Create New Session
-				</button>
+				</Button>
 
 				<div class="relative">
 					<div class="absolute inset-0 flex items-center">
@@ -67,29 +75,30 @@
 					</div>
 				</div>
 
-				<div>
-					<label for="sessionCode" class="block text-sm font-medium text-gray-700 mb-2">
+				<div class="space-y-2">
+					<label for="sessionCode" class="text-sm font-medium">
 						Session Code
 					</label>
-					<input
+					<Input
 						id="sessionCode"
 						type="text"
 						bind:value={sessionCode}
 						placeholder="Enter 8-digit code"
-						maxlength="8"
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-						oninput={() => sessionCode = sessionCode.toUpperCase()}
+						maxlength={8}
+						class="uppercase"
+						oninput={handleSessionCodeInput}
 					/>
 				</div>
 
-				<button
+				<Button
 					onclick={joinSession}
 					disabled={!playerName.trim() || sessionCode.length !== 8}
-					class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+					variant="secondary"
+					class="w-full"
 				>
 					Join Session
-				</button>
+				</Button>
 			</div>
-		</div>
-	</div>
+		</CardContent>
+	</Card>
 </div>

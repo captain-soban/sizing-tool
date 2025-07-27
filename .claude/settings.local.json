@@ -19,7 +19,9 @@
       "Bash(rm:*)",
       "Bash(npm install:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npx:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": []
   }
