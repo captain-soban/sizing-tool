@@ -1,28 +1,28 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(git add:*)",
-      "Bash(taskkill:*)",
-      "Bash(cmd /c:*)",
-      "Bash(powershell:*)",
-      "Bash(git rm:*)",
-      "Bash(npm run check:*)",
-      "Bash(npm run lint)",
-      "Bash(npm run format:*)",
-      "Bash(npm run dev:*)",
-      "Bash(npm uninstall:*)",
-      "WebFetch(domain:docs.anthropic.com)",
-      "Bash(gh auth refresh:*)",
-      "Bash(git commit:*)",
-      "Bash(mkdir:*)",
-      "Bash(find:*)",
-      "Bash(rm:*)",
-      "Bash(npm install:*)",
-      "mcp__ide__getDiagnostics",
-      "Bash(git push:*)",
-      "Bash(npx:*)",
-      "Bash(tasklist:*)"
-    ],
-    "deny": []
-  }
+	"permissions": {
+		"allow": [
+			"Bash(git add:*)",
+			"Bash(taskkill:*)",
+			"Bash(cmd /c:*)",
+			"Bash(powershell:*)",
+			"Bash(git rm:*)",
+			"Bash(npm run check:*)",
+			"Bash(npm run lint)",
+			"Bash(npm run format:*)",
+			"Bash(npm run dev:*)",
+			"Bash(npm uninstall:*)",
+			"WebFetch(domain:docs.anthropic.com)",
+			"Bash(gh auth refresh:*)",
+			"Bash(git commit:*)",
+			"Bash(mkdir:*)",
+			"Bash(find:*)",
+			"Bash(rm:*)",
+			"Bash(npm install:*)",
+			"mcp__ide__getDiagnostics",
+			"Bash(git push:*)",
+			"Bash(npx:*)",
+			"Bash(tasklist:*)"
+		],
+		"deny": []
+	}
 }

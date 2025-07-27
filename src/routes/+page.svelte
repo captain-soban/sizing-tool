@@ -39,30 +39,21 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+<div
+	class="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4"
+>
 	<Card class="w-full max-w-md">
 		<CardHeader>
-			<CardTitle class="text-3xl font-bold text-center">Planning Poker</CardTitle>
+			<CardTitle class="text-center text-3xl font-bold">Planning Poker</CardTitle>
 		</CardHeader>
 		<CardContent class="space-y-6">
 			<div class="space-y-2">
-				<label for="playerName" class="text-sm font-medium">
-					Your Name
-				</label>
-				<Input
-					id="playerName"
-					type="text"
-					bind:value={playerName}
-					placeholder="Enter your name"
-				/>
+				<label for="playerName" class="text-sm font-medium"> Your Name </label>
+				<Input id="playerName" type="text" bind:value={playerName} placeholder="Enter your name" />
 			</div>
 
 			<div class="space-y-4">
-				<Button
-					onclick={createSession}
-					disabled={!playerName.trim()}
-					class="w-full"
-				>
+				<Button onclick={createSession} disabled={!playerName.trim()} class="w-full">
 					Create New Session
 				</Button>
 
@@ -71,14 +62,12 @@
 						<div class="w-full border-t border-gray-300"></div>
 					</div>
 					<div class="relative flex justify-center text-sm">
-						<span class="px-2 bg-white text-gray-500">or</span>
+						<span class="bg-white px-2 text-gray-500">or</span>
 					</div>
 				</div>
 
 				<div class="space-y-2">
-					<label for="sessionCode" class="text-sm font-medium">
-						Session Code
-					</label>
+					<label for="sessionCode" class="text-sm font-medium"> Session Code </label>
 					<Input
 						id="sessionCode"
 						type="text"

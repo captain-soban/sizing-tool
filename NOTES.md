@@ -10,11 +10,13 @@ Use this file to keep track of business details, ideas, or anything else related
 Add more notes as your project evolves.
 
 Technical and design notes:
+
 1. Must be light weight and responsive UI
 2. Use localstorage to save data
 3. Color theme: red, white and blue. White for work area. Buttons are gray background and black text.
 
-Features: 
+Features:
+
 1. Ask for name that will be displayed during story point sizing
 2. The sizing session owner can configure the story points in the settings: fibonacci sequence as default 0 to 8, fibonacci 1 to 8, T-Shirt sizing S for Small to XL for Extra Large, 1 to 8, 0 to 8, fibonacci 0 to 13, and a free text form for comma delimited.
 3. Landing page gives option to start a new sizing session or join a session
