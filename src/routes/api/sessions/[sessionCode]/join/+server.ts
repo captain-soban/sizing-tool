@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { ServerSessionStore } from '$lib/server/sessionStore';
+import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { broadcastSessionUpdate } from '../events/+server';
 import type { RequestHandler } from './$types';
 
@@ -13,14 +13,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			return json({ error: 'Player name is required' }, { status: 400 });
 		}
 
-		const session = ServerSessionStore.joinSession(sessionCode, playerName, isObserver);
+		const session = await PostgresSessionStore.joinSession(sessionCode, playerName, isObserver);
 
 		if (!session) {
 			return json({ error: 'Session not found' }, { status: 404 });
 		}
 
 		// Broadcast update to all connected clients
-		broadcastSessionUpdate(sessionCode);
+		await broadcastSessionUpdate(sessionCode);
 
 		return json({
 			sessionCode: session.sessionCode,

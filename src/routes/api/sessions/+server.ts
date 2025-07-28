@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { ServerSessionStore } from '$lib/server/sessionStore';
+import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { generateSessionCode } from '$lib/stores/session';
 import type { RequestHandler } from './$types';
 
@@ -21,9 +21,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			if (attempts > 10) {
 				return json({ error: 'Unable to generate unique session code' }, { status: 500 });
 			}
-		} while (ServerSessionStore.getSession(sessionCode));
+		} while (await PostgresSessionStore.getSession(sessionCode));
 
-		const session = ServerSessionStore.createSession(sessionCode, hostName);
+		const session = await PostgresSessionStore.createSession(sessionCode, hostName);
 
 		return json({
 			sessionCode: session.sessionCode,
@@ -41,7 +41,7 @@ export const POST: RequestHandler = async ({ request }) => {
 // GET /api/sessions - Get all sessions (for debugging)
 export const GET: RequestHandler = async () => {
 	try {
-		const sessions = ServerSessionStore.getAllSessions();
+		const sessions = await PostgresSessionStore.getAllSessions();
 		return json(
 			sessions.map((s) => ({
 				sessionCode: s.sessionCode,

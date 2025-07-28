@@ -28,6 +28,8 @@ npm run lint         # Run ESLint and Prettier checks
 npm run format       # Format code with Prettier
 npm run check        # Type check with svelte-check
 npm run check:watch  # Type check in watch mode
+npm run db:setup     # Create PostgreSQL database
+npm run db:reset     # Reset database (removes all data)
 ```
 
 ## Code Architecture
@@ -65,9 +67,9 @@ The app follows this user journey:
 ### Build & Deployment
 
 - Frontend: SvelteKit with adapter for deployment target
-- Backend: Node.js/Express server for session management
-- Real-time: WebSocket server for live updates
-- Database: In-memory or persistent storage for session data
+- Backend: SvelteKit server routes for session management
+- Real-time: Server-Sent Events (SSE) for live updates
+- Database: PostgreSQL for persistent session storage
 
 ### Session Management
 
@@ -97,11 +99,12 @@ The app follows this user journey:
 
 ### Data Persistence Pattern
 
-- Server-side session storage with real-time synchronization
+- PostgreSQL database for persistent session storage
 - Session state includes: codes, participant names, votes, scales, session titles
 - Support for resuming sessions using 8-digit codes
 - Anonymous mode support (nicknames instead of real names)
-- Real-time updates via WebSocket or polling mechanism
+- Real-time updates via Server-Sent Events (SSE)
+- Automatic cleanup of inactive participants and old sessions
 
 ## Development Notes
 

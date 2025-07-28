@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { ServerSessionStore } from '$lib/server/sessionStore';
+import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { broadcastSessionUpdate } from '../events/+server';
 import type { RequestHandler } from './$types';
 
@@ -9,14 +9,14 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		const { sessionCode } = params;
 		const votingUpdates = await request.json();
 
-		const session = ServerSessionStore.updateVotingState(sessionCode, votingUpdates);
+		const session = await PostgresSessionStore.updateVotingState(sessionCode, votingUpdates);
 
 		if (!session) {
 			return json({ error: 'Session not found' }, { status: 404 });
 		}
 
 		// Broadcast update to all connected clients
-		broadcastSessionUpdate(sessionCode);
+		await broadcastSessionUpdate(sessionCode);
 
 		return json({
 			sessionCode: session.sessionCode,
@@ -37,14 +37,14 @@ export const POST: RequestHandler = async ({ params }) => {
 	try {
 		const { sessionCode } = params;
 
-		const session = ServerSessionStore.resetVotes(sessionCode);
+		const session = await PostgresSessionStore.resetVotes(sessionCode);
 
 		if (!session) {
 			return json({ error: 'Session not found' }, { status: 404 });
 		}
 
 		// Broadcast update to all connected clients
-		broadcastSessionUpdate(sessionCode);
+		await broadcastSessionUpdate(sessionCode);
 
 		return json({
 			sessionCode: session.sessionCode,

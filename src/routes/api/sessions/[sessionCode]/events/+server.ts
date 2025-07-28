@@ -1,4 +1,4 @@
-import { ServerSessionStore } from '$lib/server/sessionStore';
+import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import type { RequestHandler } from './$types';
 
 // Keep track of active SSE connections per session
@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ params }) => {
 	const { sessionCode } = params;
 
 	// Verify session exists
-	const session = ServerSessionStore.getSession(sessionCode);
+	const session = await PostgresSessionStore.getSession(sessionCode);
 	if (!session) {
 		return new Response('Session not found', { status: 404 });
 	}
@@ -35,24 +35,29 @@ export const GET: RequestHandler = async ({ params }) => {
 			sessionConnections.get(sessionCode)!.add(controller);
 
 			// Send initial session data
-			const currentSession = ServerSessionStore.getSession(sessionCode);
-			if (currentSession) {
-				const data = JSON.stringify({
-					type: 'session-update',
-					sessionCode: currentSession.sessionCode,
-					title: currentSession.title,
-					participants: currentSession.participants,
-					votingState: currentSession.votingState,
-					storyPointScale: currentSession.storyPointScale,
-					lastUpdated: currentSession.lastUpdated
-				});
+			PostgresSessionStore.getSession(sessionCode)
+				.then((currentSession) => {
+					if (currentSession) {
+						const data = JSON.stringify({
+							type: 'session-update',
+							sessionCode: currentSession.sessionCode,
+							title: currentSession.title,
+							participants: currentSession.participants,
+							votingState: currentSession.votingState,
+							storyPointScale: currentSession.storyPointScale,
+							lastUpdated: currentSession.lastUpdated
+						});
 
-				try {
-					controller.enqueue(`data: ${data}\n\n`);
-				} catch (error) {
-					console.log(`[SSE] Failed to send initial data to ${sessionCode}:`, error);
-				}
-			}
+						try {
+							controller.enqueue(`data: ${data}\n\n`);
+						} catch (error) {
+							console.log(`[SSE] Failed to send initial data to ${sessionCode}:`, error);
+						}
+					}
+				})
+				.catch((error) => {
+					console.error(`[SSE] Error loading initial session data:`, error);
+				});
 
 			// Send periodic heartbeat
 			const heartbeatInterval = setInterval(() => {
@@ -103,13 +108,13 @@ export const GET: RequestHandler = async ({ params }) => {
 };
 
 // Function to broadcast updates to all connected clients in a session
-export function broadcastSessionUpdate(sessionCode: string) {
+export async function broadcastSessionUpdate(sessionCode: string) {
 	const connections = sessionConnections.get(sessionCode);
 	if (!connections || connections.size === 0) {
 		return;
 	}
 
-	const session = ServerSessionStore.getSession(sessionCode);
+	const session = await PostgresSessionStore.getSession(sessionCode);
 	if (!session) {
 		return;
 	}

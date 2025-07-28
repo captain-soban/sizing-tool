@@ -1,12 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { ServerSessionStore } from '$lib/server/sessionStore';
+import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import type { RequestHandler } from './$types';
 
 // GET /api/sessions/[sessionCode] - Get session details
 export const GET: RequestHandler = async ({ params }) => {
 	try {
 		const { sessionCode } = params;
-		const session = ServerSessionStore.getSession(sessionCode);
+		const session = await PostgresSessionStore.getSession(sessionCode);
 
 		if (!session) {
 			return json({ error: 'Session not found' }, { status: 404 });
@@ -33,7 +33,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		const updates = await request.json();
 
 		if (updates.title && typeof updates.title === 'string') {
-			const session = ServerSessionStore.updateSessionTitle(sessionCode, updates.title);
+			const session = await PostgresSessionStore.updateSessionTitle(sessionCode, updates.title);
 			if (!session) {
 				return json({ error: 'Session not found' }, { status: 404 });
 			}
