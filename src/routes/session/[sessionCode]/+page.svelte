@@ -4,13 +4,10 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
-	import {
-		defaultStoryPointScales,
-		type Participant,
-		SharedSessionStore
-	} from '$lib/stores/session';
+	import { defaultStoryPointScales, type Participant } from '$lib/stores/session';
+	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
 
-	const sessionCode = $page.params.sessionCode;
+	const sessionCode = $page.params.sessionCode!;
 
 	let sessionTitle = $state('Sprint Planning Session');
 	let playerName = $state('');
@@ -24,12 +21,12 @@
 	let finalEstimate = $state<string>('');
 	let editingTitle = $state(false);
 	let tempTitle = $state('');
-	let sharedStore: SharedSessionStore | null = null;
+	let sessionClient: SessionClient;
 	let heartbeatInterval: number | null = null;
 
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
 
-	onMount(() => {
+	onMount(async () => {
 		const storedPlayerName = localStorage.getItem('playerName');
 		const storedIsHost = localStorage.getItem('isHost') === 'true';
 		const storedSessionCode = localStorage.getItem('sessionCode');
@@ -42,103 +39,101 @@
 		playerName = storedPlayerName;
 		isHost = storedIsHost;
 
-		// Load observer status
+		// Load observer status from localStorage (user preference)
 		const storedIsObserver =
 			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
 		isObserver = storedIsObserver;
 
-		// Initialize shared session store
-		sharedStore = new SharedSessionStore(sessionCode, playerName);
+		// Initialize session client
+		sessionClient = new SessionClient();
 
 		// Set up real-time updates
-		sharedStore.onUpdate(() => {
-			updateFromSharedStore();
+		sessionClient.onUpdate((sessionData: SessionData) => {
+			updateFromSessionData(sessionData);
 		});
 
-		// Join the session
-		sharedStore.joinSession(isHost, isObserver);
+		try {
+			// Join or rejoin the session
+			const sessionData = await sessionClient.joinSession(sessionCode, playerName, isObserver);
+			updateFromSessionData(sessionData);
 
-		// Load session settings
-		const storedTitle = localStorage.getItem(`session_${sessionCode}_title`);
-		const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
+			// Connect to real-time updates
+			sessionClient.connectToRealtime(sessionCode);
 
-		if (storedTitle) sessionTitle = storedTitle;
-		if (storedScale) {
-			if (storedScale === 'custom') {
-				const customScaleData = localStorage.getItem(`session_${sessionCode}_custom_scale`);
-				if (customScaleData) {
-					storyPointOptions = JSON.parse(customScaleData);
+			// Load local session settings
+			const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
+			if (storedScale) {
+				if (storedScale === 'custom') {
+					const customScaleData = localStorage.getItem(`session_${sessionCode}_custom_scale`);
+					if (customScaleData) {
+						storyPointOptions = JSON.parse(customScaleData);
+					}
+				} else {
+					storyPointOptions =
+						defaultStoryPointScales[storedScale as keyof typeof defaultStoryPointScales] ||
+						storyPointOptions;
 				}
-			} else {
-				storyPointOptions =
-					defaultStoryPointScales[storedScale as keyof typeof defaultStoryPointScales] ||
-					storyPointOptions;
 			}
+
+			// Start heartbeat to show this participant is active
+			heartbeatInterval = window.setInterval(() => {
+				if (sessionClient) {
+					sessionClient.sendHeartbeat(sessionCode, playerName);
+				}
+			}, 5000); // Send heartbeat every 5 seconds
+		} catch (error) {
+			console.error('[Session] Error joining session:', error);
+			goto('/');
 		}
-
-		// Initial load from shared store
-		updateFromSharedStore();
-
-		// Start heartbeat to show this participant is active
-		heartbeatInterval = window.setInterval(() => {
-			if (sharedStore) {
-				sharedStore.sendHeartbeat();
-				sharedStore.cleanupInactiveParticipants();
-			}
-		}, 5000); // Send heartbeat every 5 seconds
 	});
 
 	onDestroy(() => {
-		if (sharedStore) {
-			sharedStore.destroy();
+		if (sessionClient) {
+			sessionClient.disconnect();
 		}
 		if (heartbeatInterval) {
 			clearInterval(heartbeatInterval);
 		}
 	});
 
-	function updateFromSharedStore() {
-		if (!sharedStore) return;
+	function updateFromSessionData(sessionData: SessionData) {
+		sessionTitle = sessionData.title;
+		participants = sessionData.participants;
+		votingInProgress = sessionData.votingState.votingInProgress;
+		votesRevealed = sessionData.votingState.votesRevealed;
+		voteAverage = sessionData.votingState.voteAverage;
+		finalEstimate = sessionData.votingState.finalEstimate;
 
-		// Update participants from shared store
-		participants = sharedStore.getParticipants();
-
-		// Update voting state from shared store
-		const votingState = sharedStore.getVotingState();
-		votingInProgress = votingState.votingInProgress;
-		votesRevealed = votingState.votesRevealed;
-		voteAverage = votingState.voteAverage;
-		finalEstimate = votingState.finalEstimate;
+		// Update story point options if different
+		if (JSON.stringify(sessionData.storyPointScale) !== JSON.stringify(storyPointOptions)) {
+			storyPointOptions = sessionData.storyPointScale;
+		}
 	}
 
 	function saveSessionState() {
 		// Save individual session settings (not shared)
 		localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
-
-		// Update shared state
-		if (sharedStore) {
-			sharedStore.updateVotingState({
-				votingInProgress,
-				votesRevealed,
-				voteAverage,
-				finalEstimate
-			});
-		}
 	}
 
-	function toggleObserverMode() {
+	async function toggleObserverMode() {
 		isObserver = !isObserver;
 
-		// Update shared store
-		if (sharedStore) {
-			const updates: Partial<Participant> = { isObserver };
-			// Clear vote if becoming observer
-			if (isObserver) {
-				updates.voted = false;
-				updates.vote = undefined;
-				selectedVote = null;
+		// Update server state
+		if (sessionClient) {
+			try {
+				const updates: Partial<Participant> = { isObserver };
+				// Clear vote if becoming observer
+				if (isObserver) {
+					updates.voted = false;
+					updates.vote = undefined;
+					selectedVote = null;
+				}
+				await sessionClient.updateParticipant(sessionCode, playerName, updates);
+			} catch (error) {
+				console.error('[Session] Error toggling observer mode:', error);
+				// Revert the change if API call failed
+				isObserver = !isObserver;
 			}
-			sharedStore.updateParticipantStatus(updates);
 		}
 
 		saveSessionState();
@@ -155,69 +150,80 @@
 		goto(`/session/${sessionCode}/settings`);
 	}
 
-	function selectVote(vote: string) {
+	async function selectVote(vote: string) {
 		if (isObserver) return; // Observers cannot vote
 
 		selectedVote = vote;
 
-		// Update shared store
-		if (sharedStore) {
-			sharedStore.updateParticipantStatus({
-				voted: true,
-				vote: vote
-			});
+		// Update server state
+		if (sessionClient) {
+			try {
+				await sessionClient.updateParticipant(sessionCode, playerName, {
+					voted: true,
+					vote: vote
+				});
+			} catch (error) {
+				console.error('[Session] Error selecting vote:', error);
+			}
 		}
-
-		saveSessionState();
 	}
 
-	function startNewVoting() {
+	async function startNewVoting() {
 		if (!isHost) return;
 
-		votingInProgress = true;
-		votesRevealed = false;
+		// Clear local UI state
 		selectedVote = null;
-		voteAverage = '';
-		finalEstimate = '';
 
-		// Reset all participants' votes in shared store
-		if (sharedStore) {
-			const resetParticipants = sharedStore.getParticipants().map((p) => ({
-				...p,
-				voted: false,
-				vote: undefined,
-				lastSeen: Date.now()
-			}));
-			sharedStore.updateParticipants(resetParticipants);
+		// Reset votes on server
+		if (sessionClient) {
+			try {
+				await sessionClient.resetVotes(sessionCode);
+			} catch (error) {
+				console.error('[Session] Error starting new voting:', error);
+			}
 		}
-
-		saveSessionState();
 	}
 
-	function revealVotes() {
+	async function revealVotes() {
 		if (!isHost) return;
 
-		votesRevealed = true;
-
-		// Calculate average from shared participants
-		const currentParticipants = sharedStore?.getParticipants() || [];
-		const votes = currentParticipants
+		// Calculate average from current participants
+		const votes = participants
 			.filter((p) => !p.isObserver && p.vote && p.vote !== '?' && !isNaN(parseFloat(p.vote)))
 			.map((p) => parseFloat(p.vote!));
 
+		let calculatedAverage = '';
 		if (votes.length > 0) {
 			const average = votes.reduce((sum, vote) => sum + vote, 0) / votes.length;
-			voteAverage = average.toFixed(1);
+			calculatedAverage = average.toFixed(1);
 		}
 
-		saveSessionState();
+		// Update server state
+		if (sessionClient) {
+			try {
+				await sessionClient.updateVotingState(sessionCode, {
+					votesRevealed: true,
+					voteAverage: calculatedAverage
+				});
+			} catch (error) {
+				console.error('[Session] Error revealing votes:', error);
+			}
+		}
 	}
 
-	function acceptEstimate() {
+	async function acceptEstimate() {
 		if (!isHost) return;
-		finalEstimate = voteAverage;
-		votingInProgress = false;
-		saveSessionState();
+
+		if (sessionClient) {
+			try {
+				await sessionClient.updateVotingState(sessionCode, {
+					finalEstimate: voteAverage,
+					votingInProgress: false
+				});
+			} catch (error) {
+				console.error('[Session] Error accepting estimate:', error);
+			}
+		}
 	}
 
 	function startEditingTitle() {
@@ -226,10 +232,15 @@
 		tempTitle = sessionTitle;
 	}
 
-	function saveTitle() {
+	async function saveTitle() {
 		if (tempTitle.trim()) {
-			sessionTitle = tempTitle.trim();
-			localStorage.setItem(`session_${sessionCode}_title`, sessionTitle);
+			if (sessionClient) {
+				try {
+					await sessionClient.updateSessionTitle(sessionCode, tempTitle.trim());
+				} catch (error) {
+					console.error('[Session] Error saving title:', error);
+				}
+			}
 		}
 		editingTitle = false;
 		tempTitle = '';

@@ -3,25 +3,54 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
-	import { generateSessionCode } from '$lib/stores/session';
+	import { SessionClient } from '$lib/api/sessionClient';
 
 	let sessionCode = $state('');
 	let playerName = $state('');
+	let isCreating = $state(false);
+	let isJoining = $state(false);
+	let error = $state('');
 
-	function createSession() {
-		const code = generateSessionCode();
-		localStorage.setItem('sessionCode', code);
-		localStorage.setItem('playerName', playerName);
-		localStorage.setItem('isHost', 'true');
-		goto(`/session/${code}`);
+	const sessionClient = new SessionClient();
+
+	async function createSession() {
+		if (!playerName.trim()) return;
+
+		isCreating = true;
+		error = '';
+
+		try {
+			const session = await sessionClient.createSession(playerName.trim());
+			localStorage.setItem('sessionCode', session.sessionCode);
+			localStorage.setItem('playerName', playerName.trim());
+			localStorage.setItem('isHost', 'true');
+			goto(`/session/${session.sessionCode}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to create session';
+			console.error('[Landing] Error creating session:', err);
+		} finally {
+			isCreating = false;
+		}
 	}
 
-	function joinSession() {
-		if (sessionCode.length === 8 && playerName.trim()) {
-			localStorage.setItem('sessionCode', sessionCode.toUpperCase());
-			localStorage.setItem('playerName', playerName);
+	async function joinSession() {
+		if (sessionCode.length !== 8 || !playerName.trim()) return;
+
+		isJoining = true;
+		error = '';
+
+		try {
+			const upperSessionCode = sessionCode.toUpperCase();
+			await sessionClient.joinSession(upperSessionCode, playerName.trim());
+			localStorage.setItem('sessionCode', upperSessionCode);
+			localStorage.setItem('playerName', playerName.trim());
 			localStorage.setItem('isHost', 'false');
-			goto(`/session/${sessionCode.toUpperCase()}`);
+			goto(`/session/${upperSessionCode}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to join session';
+			console.error('[Landing] Error joining session:', err);
+		} finally {
+			isJoining = false;
 		}
 	}
 
@@ -37,6 +66,13 @@
 			<CardTitle class="text-poker-blue text-center text-3xl font-bold">Planning Poker</CardTitle>
 		</CardHeader>
 		<CardContent class="space-y-6">
+			<!-- Error Message -->
+			{#if error}
+				<div class="rounded-md bg-red-100 p-3 text-sm text-red-800">
+					{error}
+				</div>
+			{/if}
+
 			<div class="space-y-2">
 				<label for="playerName" class="text-sm font-medium"> Your Name </label>
 				<Input id="playerName" type="text" bind:value={playerName} placeholder="Enter your name" />
@@ -45,10 +81,14 @@
 			<div class="space-y-4">
 				<Button
 					onclick={createSession}
-					disabled={!playerName.trim()}
+					disabled={!playerName.trim() || isCreating || isJoining}
 					class="bg-poker-blue hover:bg-poker-blue/90 w-full"
 				>
-					Create New Session
+					{#if isCreating}
+						Creating...
+					{:else}
+						Create New Session
+					{/if}
 				</Button>
 
 				<div class="relative">
@@ -75,10 +115,14 @@
 
 				<Button
 					onclick={joinSession}
-					disabled={!playerName.trim() || sessionCode.length !== 8}
+					disabled={!playerName.trim() || sessionCode.length !== 8 || isCreating || isJoining}
 					class="btn-poker-gray w-full"
 				>
-					Join Session
+					{#if isJoining}
+						Joining...
+					{:else}
+						Join Session
+					{/if}
 				</Button>
 			</div>
 		</CardContent>

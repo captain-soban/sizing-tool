@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **SvelteKit-based Planning Poker/Story Point Sizing Tool** for agile development teams. It's a client-side only application with no backend dependencies, using localStorage for data persistence. The application simulates a poker game where team members choose from predefined story points to estimate complexity and effort for features or tasks.
+This is a **SvelteKit-based Planning Poker/Story Point Sizing Tool** for agile development teams. The application enables real-time multi-user collaboration where team members choose from predefined story points to estimate complexity and effort for features or tasks.
 
 ## Technology Stack
 
@@ -43,10 +43,10 @@ The app follows this user journey:
 
 ### State Management
 
-- **Current Implementation**: Direct localStorage usage in components (`+page.svelte`)
-- **Planned Architecture**: Custom `localStore` utility for reactive localStorage persistence
-- Built on Svelte 5's `$state` runes instead of legacy Svelte stores
-- All application data persists client-side with no external API calls
+- **Frontend State**: Built on Svelte 5's `$state` runes for reactive UI updates
+- **Session Persistence**: Real-time multi-user sessions with backend API
+- **Real-time Updates**: WebSocket or polling for live participant synchronization
+- **Local Storage**: Used only for user preferences and session reconnection
 
 ### Component Architecture
 
@@ -64,17 +64,18 @@ The app follows this user journey:
 
 ### Build & Deployment
 
-- Uses `@sveltejs/adapter-static` for client-side only deployment
-- Static site generation with no fallback pages
-- Build output goes to `build/` directory
-- No server-side rendering required
+- Frontend: SvelteKit with adapter for deployment target
+- Backend: Node.js/Express server for session management
+- Real-time: WebSocket server for live updates
+- Database: In-memory or persistent storage for session data
 
-### Session Management (Current Implementation)
+### Session Management
 
 - **Session Creation**: Generates 8-digit alphanumeric codes (excluding '0' and 'o')
-- **Data Storage**: Uses localStorage with keys: `sessionCode`, `playerName`, `isHost`
+- **Data Storage**: Server-side session storage with real-time synchronization
 - **User Roles**: Distinguishes between session owner (host) and participants
 - **Session Title**: Each session has a title (sprint cycle, epic, or feature name)
+- **Multi-user Support**: Real-time participant visibility and voting
 
 ## Key Features & Business Logic
 
@@ -96,16 +97,17 @@ The app follows this user journey:
 
 ### Data Persistence Pattern
 
-- All session data stored in localStorage (no external APIs)
+- Server-side session storage with real-time synchronization
 - Session state includes: codes, participant names, votes, scales, session titles
 - Support for resuming sessions using 8-digit codes
 - Anonymous mode support (nicknames instead of real names)
+- Real-time updates via WebSocket or polling mechanism
 
 ## Development Notes
 
 - **Svelte 5 Modern Patterns**: Always use `$state` and `$effect` runes, never legacy reactive statements
 - **Component Priority**: Use shadcn-svelte components first, fallback to custom Svelte 5 components
 - **Type Safety**: Maintain strict TypeScript configuration throughout
-- **No Backend Dependencies**: Everything must work offline with localStorage only
 - **Session Code Generation**: Must exclude '0' and 'o' characters for visual clarity
-- **Privacy-First**: Support anonymous voting modes, no data leaves the client
+- **Privacy-First**: Support anonymous voting modes with minimal data collection
+- **Real-time Architecture**: Backend API with WebSocket support for live collaboration

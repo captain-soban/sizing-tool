@@ -119,7 +119,8 @@ export class SharedSessionStore {
 
 	// Get shared participants list
 	getParticipants(): Participant[] {
-		const stored = localStorage.getItem(`session_${this.sessionCode}_shared_participants`);
+		const key = `session_${this.sessionCode}_shared_participants`;
+		const stored = localStorage.getItem(key);
 		return stored ? JSON.parse(stored) : [];
 	}
 

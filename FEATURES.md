@@ -23,7 +23,11 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
   --- Visual and text indicator if their active or observer
 
 ### Voting System
-
+- Real time voting
+  - Participants can see each other in the poker planning session
+    -- they can see if a player has voted or not
+    -- participants can see who is observing or an active participant
+      --- animated icon if a plarticipant is still deciding on a vote
 - **Story Point Scales**: Configurable voting scales in settings
   - Fibonacci 0-8 (default)
   - Fibonacci 1-8
