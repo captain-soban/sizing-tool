@@ -63,12 +63,35 @@
 		const storedParticipants = localStorage.getItem(`session_${sessionCode}_participants`);
 		if (storedParticipants) {
 			participants = JSON.parse(storedParticipants);
+			// Ensure current player is in participants list
+			const existingParticipant = participants.find((p) => p.name === playerName);
+			if (!existingParticipant) {
+				participants.push({
+					name: playerName,
+					voted: false,
+					isHost: isHost,
+					isObserver: isObserver
+				});
+				saveSessionState();
+			} else {
+				// Update existing participant's host/observer status
+				existingParticipant.isHost = isHost;
+				existingParticipant.isObserver = isObserver;
+				saveSessionState();
+			}
 		} else {
+			// Initialize with current player and some demo participants for testing
+			// In a real app, this would be empty and participants would join dynamically
+			const demoParticipants = isHost
+				? [
+						{ name: 'Demo User 1', voted: false, isHost: false, isObserver: false },
+						{ name: 'Demo User 2', voted: false, isHost: false, isObserver: true }
+					]
+				: [];
+
 			participants = [
 				{ name: playerName, voted: false, isHost: isHost, isObserver: isObserver },
-				{ name: 'Alice', voted: false, isHost: false, isObserver: false },
-				{ name: 'Bob', voted: false, isHost: false, isObserver: false },
-				{ name: 'Charlie', voted: false, isHost: false, isObserver: true }
+				...demoParticipants
 			];
 			saveSessionState();
 		}
@@ -190,15 +213,24 @@
 	}
 
 	function getParticipantPosition(index: number, total: number) {
-		const angle = (index * 360) / total - 90;
-		const radius = 45; // Increased radius to position outside the table
-		const x = 50 + radius * Math.cos((angle * Math.PI) / 180);
-		const y = 50 + radius * Math.sin((angle * Math.PI) / 180);
+		const angle = (index * 360) / total - 90; // Start from top (12 o'clock position)
+		const radiusX = 47; // Horizontal radius for elliptical positioning
+		const radiusY = 45; // Vertical radius for elliptical positioning
+		const x = 50 + radiusX * Math.cos((angle * Math.PI) / 180);
+		const y = 50 + radiusY * Math.sin((angle * Math.PI) / 180);
 		return { x: `${x}%`, y: `${y}%` };
 	}
 </script>
 
 <div class="min-h-screen p-4">
+	<!-- Session Title - Upper Left -->
+	<div class="fixed top-4 left-4 z-10">
+		<div class="rounded-lg border bg-white/90 px-3 py-2 shadow-lg backdrop-blur-sm">
+			<h1 class="text-poker-blue text-sm font-bold sm:text-base lg:text-lg">{sessionTitle}</h1>
+			<p class="text-xs text-gray-600">Session: {sessionCode}</p>
+		</div>
+	</div>
+
 	<!-- Top Controls -->
 	<div class="fixed top-4 right-4 z-10 flex gap-2">
 		<Button
@@ -215,25 +247,25 @@
 	</div>
 
 	<!-- Main Poker Table -->
-	<div class="flex min-h-screen items-center justify-center">
-		<div class="relative">
+	<div class="flex min-h-screen items-center justify-center p-2">
+		<div class="relative w-full max-w-5xl">
 			<!-- Poker Table Container with participants positioned around it -->
-			<div class="relative h-[700px] w-[900px]">
+			<div class="relative aspect-[4/3] max-h-[700px] min-h-[500px] w-full">
 				<!-- Poker Table (Oval) -->
 				<div
-					class="absolute top-[10%] left-[10%] h-[480px] w-[640px] rounded-full border-8 border-amber-900 bg-green-800 shadow-2xl"
+					class="absolute top-[12%] right-[12%] bottom-[12%] left-[12%] rounded-full border-4 border-amber-900 bg-green-800 shadow-2xl sm:border-6 lg:border-8"
 				>
 					<!-- Table Center Area -->
-					<div class="absolute inset-0 flex flex-col items-center justify-center">
-						<Card class="work-area max-w-sm text-center">
-							<CardContent class="p-6">
+					<div class="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-4">
+						<Card class="work-area w-full max-w-xs text-center sm:max-w-sm">
+							<CardContent class="p-3 sm:p-4 lg:p-6">
 								<!-- Session Title -->
 								{#if editingTitle}
-									<div class="mb-4 space-y-2">
+									<div class="mb-3 space-y-2 sm:mb-4">
 										<input
 											type="text"
 											bind:value={tempTitle}
-											class="w-full rounded border p-2 text-center text-lg font-bold"
+											class="w-full rounded border p-2 text-center text-sm font-bold sm:text-lg"
 											placeholder="Enter session title"
 											autofocus
 											onkeydown={(e) => {
@@ -245,7 +277,7 @@
 											<Button
 												onclick={saveTitle}
 												size="sm"
-												class="bg-green-500 text-white hover:bg-green-600"
+												class="bg-green-500 text-xs text-white hover:bg-green-600 sm:text-sm"
 											>
 												Save
 											</Button>
@@ -253,23 +285,23 @@
 												onclick={cancelEditTitle}
 												variant="outline"
 												size="sm"
-												class="btn-poker-gray"
+												class="btn-poker-gray text-xs sm:text-sm"
 											>
 												Cancel
 											</Button>
 										</div>
 									</div>
 								{:else}
-									<div class="group mb-4">
+									<div class="group mb-3 sm:mb-4">
 										<h2
-											class="text-poker-blue hover:text-poker-blue/80 cursor-pointer text-xl font-bold transition-colors"
+											class="text-poker-blue hover:text-poker-blue/80 cursor-pointer text-lg leading-tight font-bold transition-colors sm:text-xl lg:text-2xl"
 											onclick={startEditingTitle}
 											title={isHost ? 'Click to edit title' : 'Session title'}
 										>
 											{sessionTitle}
 											{#if isHost}
 												<span
-													class="ml-2 text-sm opacity-0 transition-opacity group-hover:opacity-100"
+													class="ml-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 sm:ml-2 sm:text-sm"
 													>✏️</span
 												>
 											{/if}
@@ -279,26 +311,29 @@
 
 								<!-- Voting Status and Results -->
 								{#if votesRevealed && voteAverage}
-									<div class="space-y-3">
-										<p class="text-muted-foreground text-sm">Team Average:</p>
-										<p class="text-poker-red bounce-in text-4xl font-bold">{voteAverage}</p>
+									<div class="space-y-2 sm:space-y-3">
+										<p class="text-muted-foreground text-xs sm:text-sm">Team Average:</p>
+										<p class="text-poker-red bounce-in text-2xl font-bold sm:text-3xl lg:text-4xl">
+											{voteAverage}
+										</p>
 
 										{#if isHost && !finalEstimate}
-											<div class="mt-4 space-y-2">
+											<div class="mt-3 space-y-2 sm:mt-4">
 												<div class="flex justify-center gap-2">
 													<Button
 														onclick={acceptEstimate}
-														class="bg-green-500 text-white hover:bg-green-600"
+														class="bg-green-500 px-3 text-xs text-white hover:bg-green-600 sm:px-4 sm:text-sm"
+														size="sm"
 													>
 														✓ Accept {voteAverage}
 													</Button>
 												</div>
-												<div class="flex justify-center gap-2">
+												<div class="flex flex-wrap justify-center gap-1 sm:gap-2">
 													<Button
 														onclick={startNewVoting}
 														variant="outline"
 														size="sm"
-														class="btn-poker-gray"
+														class="btn-poker-gray text-xs sm:text-sm"
 													>
 														🔄 Re-vote
 													</Button>
@@ -313,7 +348,7 @@
 														}}
 														variant="outline"
 														size="sm"
-														class="btn-poker-gray"
+														class="btn-poker-gray text-xs sm:text-sm"
 													>
 														✏️ Custom
 													</Button>
@@ -380,46 +415,57 @@
 						class="absolute -translate-x-1/2 -translate-y-1/2 transform"
 						style="left: {position.x}; top: {position.y};"
 					>
-						<div class="flex flex-col items-center space-y-2">
+						<div class="flex flex-col items-center space-y-1 sm:space-y-2">
 							<!-- Participant Card -->
-							<Card class="work-area min-w-[120px]">
-								<CardContent class="p-3 text-center">
-									<div class="mb-1 flex items-center justify-center space-x-1">
-										<span class="text-sm font-medium">{participant.name}</span>
+							<Card class="work-area max-w-[140px] min-w-[100px] sm:min-w-[120px]">
+								<CardContent class="p-2 text-center sm:p-3">
+									<div class="mb-1 flex flex-wrap items-center justify-center space-x-1">
+										<span class="text-xs font-medium break-words sm:text-sm"
+											>{participant.name}</span
+										>
 										{#if participant.isHost}
-											<span class="bg-poker-blue rounded px-1 text-xs text-white">HOST</span>
+											<span class="bg-poker-blue rounded px-1 text-[10px] text-white sm:text-xs"
+												>HOST</span
+											>
 										{/if}
 										{#if participant.isObserver}
-											<span class="rounded bg-orange-200 px-1 text-xs text-orange-800">👁️</span>
+											<span
+												class="rounded bg-orange-200 px-1 text-[10px] text-orange-800 sm:text-xs"
+												>👁️</span
+											>
 										{/if}
 									</div>
 
 									<!-- Vote Status Indicator -->
 									<div class="flex justify-center">
 										{#if participant.isObserver}
-											<div class="rounded-md bg-orange-100 px-3 py-1 text-xs text-orange-600">
+											<div
+												class="rounded-md bg-orange-100 px-2 py-1 text-[10px] text-orange-600 sm:px-3 sm:text-xs"
+											>
 												👁️ Observer
 											</div>
 										{:else if votesRevealed && participant.vote}
 											<div
-												class="bounce-in bg-poker-blue rounded-md px-3 py-1 font-bold text-white"
+												class="bounce-in bg-poker-blue rounded-md px-2 py-1 text-xs font-bold text-white sm:px-3 sm:text-sm"
 											>
 												{participant.vote}
 											</div>
 										{:else if participant.voted}
 											<div
-												class="bounce-in rounded-md bg-green-500 px-3 py-1 font-medium text-white"
+												class="bounce-in rounded-md bg-green-500 px-2 py-1 text-[10px] font-medium text-white sm:px-3 sm:text-xs"
 											>
 												✓ Voted
 											</div>
 										{:else if votingInProgress}
 											<div
-												class="thinking rounded-md bg-yellow-100 px-3 py-1 text-sm text-yellow-700"
+												class="thinking rounded-md bg-yellow-100 px-2 py-1 text-[10px] text-yellow-700 sm:px-3 sm:text-xs"
 											>
 												🤔 Thinking...
 											</div>
 										{:else}
-											<div class="rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-500">
+											<div
+												class="rounded-md bg-gray-100 px-2 py-1 text-[10px] text-gray-500 sm:px-3 sm:text-xs"
+											>
 												Ready
 											</div>
 										{/if}
