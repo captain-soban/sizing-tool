@@ -11,6 +11,7 @@
 	let sessionTitle = $state('Sprint Planning Session');
 	let playerName = $state('');
 	let isHost = $state(false);
+	let isObserver = $state(false);
 	let participants = $state<Participant[]>([]);
 	let votingInProgress = $state(false);
 	let votesRevealed = $state(false);
@@ -32,6 +33,11 @@
 
 		playerName = storedPlayerName;
 		isHost = storedIsHost;
+
+		// Load observer status
+		const storedIsObserver =
+			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
+		isObserver = storedIsObserver;
 
 		// Load session settings
 		const storedTitle = localStorage.getItem(`session_${sessionCode}_title`);
@@ -57,10 +63,10 @@
 			participants = JSON.parse(storedParticipants);
 		} else {
 			participants = [
-				{ name: playerName, voted: false, isHost: isHost },
-				{ name: 'Alice', voted: false, isHost: false },
-				{ name: 'Bob', voted: false, isHost: false },
-				{ name: 'Charlie', voted: false, isHost: false }
+				{ name: playerName, voted: false, isHost: isHost, isObserver: isObserver },
+				{ name: 'Alice', voted: false, isHost: false, isObserver: false },
+				{ name: 'Bob', voted: false, isHost: false, isObserver: false },
+				{ name: 'Charlie', voted: false, isHost: false, isObserver: true }
 			];
 			saveSessionState();
 		}
@@ -87,6 +93,23 @@
 				finalEstimate
 			})
 		);
+		// Save observer status
+		localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
+	}
+
+	function toggleObserverMode() {
+		isObserver = !isObserver;
+		const participantIndex = participants.findIndex((p) => p.name === playerName);
+		if (participantIndex !== -1) {
+			participants[participantIndex].isObserver = isObserver;
+			// Clear vote if becoming observer
+			if (isObserver) {
+				participants[participantIndex].voted = false;
+				participants[participantIndex].vote = undefined;
+				selectedVote = null;
+			}
+			saveSessionState();
+		}
 	}
 
 	function exitSession() {
@@ -101,6 +124,8 @@
 	}
 
 	function selectVote(vote: string) {
+		if (isObserver) return; // Observers cannot vote
+
 		selectedVote = vote;
 		const participantIndex = participants.findIndex((p) => p.name === playerName);
 		if (participantIndex !== -1) {
@@ -124,8 +149,9 @@
 		if (!isHost) return;
 
 		votesRevealed = true;
+		// Only include votes from active participants (not observers)
 		const votes = participants
-			.filter((p) => p.vote && p.vote !== '?' && !isNaN(parseFloat(p.vote)))
+			.filter((p) => !p.isObserver && p.vote && p.vote !== '?' && !isNaN(parseFloat(p.vote)))
 			.map((p) => parseFloat(p.vote!));
 		if (votes.length > 0) {
 			const average = votes.reduce((sum, vote) => sum + vote, 0) / votes.length;
@@ -153,6 +179,15 @@
 <div class="min-h-screen p-4">
 	<!-- Top Controls -->
 	<div class="fixed top-4 right-4 z-10 flex gap-2">
+		<Button
+			variant="outline"
+			onclick={toggleObserverMode}
+			class={isObserver
+				? 'border-orange-300 bg-orange-100 text-orange-800 hover:bg-orange-200'
+				: 'border-green-300 bg-green-100 text-green-800 hover:bg-green-200'}
+		>
+			{isObserver ? '👁️ Observer' : '🗳️ Participant'}
+		</Button>
 		<Button variant="outline" size="icon" onclick={goToSettings} class="btn-poker-gray">⚙️</Button>
 		<Button variant="outline" onclick={exitSession} class="btn-poker-gray">Exit</Button>
 	</div>
@@ -238,11 +273,18 @@
 										{#if participant.isHost}
 											<span class="bg-poker-blue rounded px-1 text-xs text-white">HOST</span>
 										{/if}
+										{#if participant.isObserver}
+											<span class="rounded bg-orange-200 px-1 text-xs text-orange-800">👁️</span>
+										{/if}
 									</div>
 
 									<!-- Vote Status Indicator -->
 									<div class="flex justify-center">
-										{#if votesRevealed && participant.vote}
+										{#if participant.isObserver}
+											<div class="rounded-md bg-orange-100 px-3 py-1 text-xs text-orange-600">
+												Observer
+											</div>
+										{:else if votesRevealed && participant.vote}
 											<div class="bg-poker-blue rounded-md px-3 py-1 font-bold text-white">
 												{participant.vote}
 											</div>
@@ -264,7 +306,7 @@
 	</div>
 
 	<!-- Voting Cards (Bottom) -->
-	{#if votingInProgress && !votesRevealed}
+	{#if votingInProgress && !votesRevealed && !isObserver}
 		<div class="fixed bottom-8 left-1/2 -translate-x-1/2 transform">
 			<Card class="work-area">
 				<CardContent class="p-4">
@@ -283,6 +325,19 @@
 							</Button>
 						{/each}
 					</div>
+				</CardContent>
+			</Card>
+		</div>
+	{/if}
+
+	<!-- Observer Message (Bottom) -->
+	{#if votingInProgress && !votesRevealed && isObserver}
+		<div class="fixed bottom-8 left-1/2 -translate-x-1/2 transform">
+			<Card class="work-area">
+				<CardContent class="p-4">
+					<p class="text-center text-sm text-orange-600">
+						👁️ You are observing this session. Toggle to participant mode to vote.
+					</p>
 				</CardContent>
 			</Card>
 		</div>
