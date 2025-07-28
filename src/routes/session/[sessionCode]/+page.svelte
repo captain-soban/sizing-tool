@@ -191,7 +191,7 @@
 
 	function getParticipantPosition(index: number, total: number) {
 		const angle = (index * 360) / total - 90;
-		const radius = 35;
+		const radius = 45; // Increased radius to position outside the table
 		const x = 50 + radius * Math.cos((angle * Math.PI) / 180);
 		const y = 50 + radius * Math.sin((angle * Math.PI) / 180);
 		return { x: `${x}%`, y: `${y}%` };
@@ -217,160 +217,163 @@
 	<!-- Main Poker Table -->
 	<div class="flex min-h-screen items-center justify-center">
 		<div class="relative">
-			<!-- Poker Table (Oval) -->
-			<div
-				class="relative h-[600px] w-[800px] rounded-full border-8 border-amber-900 bg-green-800 shadow-2xl"
-			>
-				<!-- Table Center Area -->
-				<div class="absolute inset-0 flex flex-col items-center justify-center">
-					<Card class="work-area max-w-sm text-center">
-						<CardContent class="p-6">
-							<!-- Session Title -->
-							{#if editingTitle}
-								<div class="mb-4 space-y-2">
-									<input
-										type="text"
-										bind:value={tempTitle}
-										class="w-full rounded border p-2 text-center text-lg font-bold"
-										placeholder="Enter session title"
-										autofocus
-										onkeydown={(e) => {
-											if (e.key === 'Enter') saveTitle();
-											if (e.key === 'Escape') cancelEditTitle();
-										}}
-									/>
-									<div class="flex justify-center gap-2">
-										<Button
-											onclick={saveTitle}
-											size="sm"
-											class="bg-green-500 text-white hover:bg-green-600"
-										>
-											Save
-										</Button>
-										<Button
-											onclick={cancelEditTitle}
-											variant="outline"
-											size="sm"
-											class="btn-poker-gray"
-										>
-											Cancel
-										</Button>
-									</div>
-								</div>
-							{:else}
-								<div class="group mb-4">
-									<h2
-										class="text-poker-blue hover:text-poker-blue/80 cursor-pointer text-xl font-bold transition-colors"
-										onclick={startEditingTitle}
-										title={isHost ? 'Click to edit title' : 'Session title'}
-									>
-										{sessionTitle}
-										{#if isHost}
-											<span
-												class="ml-2 text-sm opacity-0 transition-opacity group-hover:opacity-100"
-												>✏️</span
+			<!-- Poker Table Container with participants positioned around it -->
+			<div class="relative h-[700px] w-[900px]">
+				<!-- Poker Table (Oval) -->
+				<div
+					class="absolute top-[10%] left-[10%] h-[480px] w-[640px] rounded-full border-8 border-amber-900 bg-green-800 shadow-2xl"
+				>
+					<!-- Table Center Area -->
+					<div class="absolute inset-0 flex flex-col items-center justify-center">
+						<Card class="work-area max-w-sm text-center">
+							<CardContent class="p-6">
+								<!-- Session Title -->
+								{#if editingTitle}
+									<div class="mb-4 space-y-2">
+										<input
+											type="text"
+											bind:value={tempTitle}
+											class="w-full rounded border p-2 text-center text-lg font-bold"
+											placeholder="Enter session title"
+											autofocus
+											onkeydown={(e) => {
+												if (e.key === 'Enter') saveTitle();
+												if (e.key === 'Escape') cancelEditTitle();
+											}}
+										/>
+										<div class="flex justify-center gap-2">
+											<Button
+												onclick={saveTitle}
+												size="sm"
+												class="bg-green-500 text-white hover:bg-green-600"
 											>
-										{/if}
-									</h2>
-								</div>
-							{/if}
-
-							<!-- Voting Status and Results -->
-							{#if votesRevealed && voteAverage}
-								<div class="space-y-3">
-									<p class="text-muted-foreground text-sm">Team Average:</p>
-									<p class="text-poker-red bounce-in text-4xl font-bold">{voteAverage}</p>
-
-									{#if isHost && !finalEstimate}
-										<div class="mt-4 space-y-2">
-											<div class="flex justify-center gap-2">
-												<Button
-													onclick={acceptEstimate}
-													class="bg-green-500 text-white hover:bg-green-600"
-												>
-													✓ Accept {voteAverage}
-												</Button>
-											</div>
-											<div class="flex justify-center gap-2">
-												<Button
-													onclick={startNewVoting}
-													variant="outline"
-													size="sm"
-													class="btn-poker-gray"
-												>
-													🔄 Re-vote
-												</Button>
-												<Button
-													onclick={() => {
-														const customValue = prompt('Enter custom estimate:', voteAverage);
-														if (customValue && customValue.trim()) {
-															finalEstimate = customValue.trim();
-															votingInProgress = false;
-															saveSessionState();
-														}
-													}}
-													variant="outline"
-													size="sm"
-													class="btn-poker-gray"
-												>
-													✏️ Custom
-												</Button>
-											</div>
+												Save
+											</Button>
+											<Button
+												onclick={cancelEditTitle}
+												variant="outline"
+												size="sm"
+												class="btn-poker-gray"
+											>
+												Cancel
+											</Button>
 										</div>
-									{/if}
-
-									{#if finalEstimate}
-										<div class="mt-4 rounded-md border-2 border-green-300 bg-green-100 p-3">
-											<p class="font-medium text-green-800">
-												Final Estimate: <span class="text-2xl font-bold">{finalEstimate}</span>
-											</p>
-											{#if isHost}
-												<Button
-													onclick={() => {
-														finalEstimate = '';
-														saveSessionState();
-													}}
-													variant="outline"
-													size="sm"
-													class="mt-2 text-xs"
-												>
-													Reset
-												</Button>
-											{/if}
-										</div>
-									{/if}
-								</div>
-							{:else if votingInProgress}
-								<div class="space-y-3">
-									<p class="text-muted-foreground">🗳️ Voting in progress...</p>
-									<div class="text-sm text-gray-600">
-										{participants.filter((p) => !p.isObserver && p.voted).length} / {participants.filter(
-											(p) => !p.isObserver
-										).length} votes cast
 									</div>
-									{#if isHost}
-										<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90">
-											🎭 Reveal Votes
-										</Button>
-									{/if}
-								</div>
-							{:else}
-								<div class="space-y-3">
-									<p class="text-muted-foreground">Ready to start voting</p>
-									{#if isHost}
-										<Button onclick={startNewVoting} class="bg-poker-blue hover:bg-poker-blue/90">
-											🚀 Start Voting
-										</Button>
-									{:else}
-										<p class="text-sm text-gray-500">Waiting for host to start...</p>
-									{/if}
-								</div>
-							{/if}
-						</CardContent>
-					</Card>
+								{:else}
+									<div class="group mb-4">
+										<h2
+											class="text-poker-blue hover:text-poker-blue/80 cursor-pointer text-xl font-bold transition-colors"
+											onclick={startEditingTitle}
+											title={isHost ? 'Click to edit title' : 'Session title'}
+										>
+											{sessionTitle}
+											{#if isHost}
+												<span
+													class="ml-2 text-sm opacity-0 transition-opacity group-hover:opacity-100"
+													>✏️</span
+												>
+											{/if}
+										</h2>
+									</div>
+								{/if}
+
+								<!-- Voting Status and Results -->
+								{#if votesRevealed && voteAverage}
+									<div class="space-y-3">
+										<p class="text-muted-foreground text-sm">Team Average:</p>
+										<p class="text-poker-red bounce-in text-4xl font-bold">{voteAverage}</p>
+
+										{#if isHost && !finalEstimate}
+											<div class="mt-4 space-y-2">
+												<div class="flex justify-center gap-2">
+													<Button
+														onclick={acceptEstimate}
+														class="bg-green-500 text-white hover:bg-green-600"
+													>
+														✓ Accept {voteAverage}
+													</Button>
+												</div>
+												<div class="flex justify-center gap-2">
+													<Button
+														onclick={startNewVoting}
+														variant="outline"
+														size="sm"
+														class="btn-poker-gray"
+													>
+														🔄 Re-vote
+													</Button>
+													<Button
+														onclick={() => {
+															const customValue = prompt('Enter custom estimate:', voteAverage);
+															if (customValue && customValue.trim()) {
+																finalEstimate = customValue.trim();
+																votingInProgress = false;
+																saveSessionState();
+															}
+														}}
+														variant="outline"
+														size="sm"
+														class="btn-poker-gray"
+													>
+														✏️ Custom
+													</Button>
+												</div>
+											</div>
+										{/if}
+
+										{#if finalEstimate}
+											<div class="mt-4 rounded-md border-2 border-green-300 bg-green-100 p-3">
+												<p class="font-medium text-green-800">
+													Final Estimate: <span class="text-2xl font-bold">{finalEstimate}</span>
+												</p>
+												{#if isHost}
+													<Button
+														onclick={() => {
+															finalEstimate = '';
+															saveSessionState();
+														}}
+														variant="outline"
+														size="sm"
+														class="mt-2 text-xs"
+													>
+														Reset
+													</Button>
+												{/if}
+											</div>
+										{/if}
+									</div>
+								{:else if votingInProgress}
+									<div class="space-y-3">
+										<p class="text-muted-foreground">🗳️ Voting in progress...</p>
+										<div class="text-sm text-gray-600">
+											{participants.filter((p) => !p.isObserver && p.voted).length} / {participants.filter(
+												(p) => !p.isObserver
+											).length} votes cast
+										</div>
+										{#if isHost}
+											<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90">
+												🎭 Reveal Votes
+											</Button>
+										{/if}
+									</div>
+								{:else}
+									<div class="space-y-3">
+										<p class="text-muted-foreground">Ready to start voting</p>
+										{#if isHost}
+											<Button onclick={startNewVoting} class="bg-poker-blue hover:bg-poker-blue/90">
+												🚀 Start Voting
+											</Button>
+										{:else}
+											<p class="text-sm text-gray-500">Waiting for host to start...</p>
+										{/if}
+									</div>
+								{/if}
+							</CardContent>
+						</Card>
+					</div>
 				</div>
 
-				<!-- Participants Around Table -->
+				<!-- Participants Around Table (Outside the table) -->
 				{#each participants as participant, index (participant.name)}
 					{@const position = getParticipantPosition(index, participants.length)}
 					<div
