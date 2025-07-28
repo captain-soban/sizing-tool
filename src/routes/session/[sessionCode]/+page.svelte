@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
-	import { defaultStoryPointScales, type Participant } from '$lib/stores/session';
+	import {
+		defaultStoryPointScales,
+		type Participant,
+		SharedSessionStore
+	} from '$lib/stores/session';
 
 	const sessionCode = $page.params.sessionCode;
 
@@ -20,6 +24,8 @@
 	let finalEstimate = $state<string>('');
 	let editingTitle = $state(false);
 	let tempTitle = $state('');
+	let sharedStore: SharedSessionStore | null = null;
+	let heartbeatInterval: number | null = null;
 
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
 
@@ -41,6 +47,17 @@
 			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
 		isObserver = storedIsObserver;
 
+		// Initialize shared session store
+		sharedStore = new SharedSessionStore(sessionCode, playerName);
+
+		// Set up real-time updates
+		sharedStore.onUpdate(() => {
+			updateFromSharedStore();
+		});
+
+		// Join the session
+		sharedStore.joinSession(isHost, isObserver);
+
 		// Load session settings
 		const storedTitle = localStorage.getItem(`session_${sessionCode}_title`);
 		const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
@@ -59,82 +76,72 @@
 			}
 		}
 
-		// Load session state or initialize
-		const storedParticipants = localStorage.getItem(`session_${sessionCode}_participants`);
-		if (storedParticipants) {
-			participants = JSON.parse(storedParticipants);
-			// Ensure current player is in participants list
-			const existingParticipant = participants.find((p) => p.name === playerName);
-			if (!existingParticipant) {
-				participants.push({
-					name: playerName,
-					voted: false,
-					isHost: isHost,
-					isObserver: isObserver
-				});
-				saveSessionState();
-			} else {
-				// Update existing participant's host/observer status
-				existingParticipant.isHost = isHost;
-				existingParticipant.isObserver = isObserver;
-				saveSessionState();
+		// Initial load from shared store
+		updateFromSharedStore();
+
+		// Start heartbeat to show this participant is active
+		heartbeatInterval = window.setInterval(() => {
+			if (sharedStore) {
+				sharedStore.sendHeartbeat();
+				sharedStore.cleanupInactiveParticipants();
 			}
-		} else {
-			// Initialize with current player and some demo participants for testing
-			// In a real app, this would be empty and participants would join dynamically
-			const demoParticipants = isHost
-				? [
-						{ name: 'Demo User 1', voted: false, isHost: false, isObserver: false },
-						{ name: 'Demo User 2', voted: false, isHost: false, isObserver: true }
-					]
-				: [];
+		}, 5000); // Send heartbeat every 5 seconds
+	});
 
-			participants = [
-				{ name: playerName, voted: false, isHost: isHost, isObserver: isObserver },
-				...demoParticipants
-			];
-			saveSessionState();
+	onDestroy(() => {
+		if (sharedStore) {
+			sharedStore.destroy();
 		}
-
-		// Load voting state
-		const storedVotingState = localStorage.getItem(`session_${sessionCode}_voting`);
-		if (storedVotingState) {
-			const votingState = JSON.parse(storedVotingState);
-			votingInProgress = votingState.votingInProgress || false;
-			votesRevealed = votingState.votesRevealed || false;
-			voteAverage = votingState.voteAverage || '';
-			finalEstimate = votingState.finalEstimate || '';
+		if (heartbeatInterval) {
+			clearInterval(heartbeatInterval);
 		}
 	});
 
+	function updateFromSharedStore() {
+		if (!sharedStore) return;
+
+		// Update participants from shared store
+		participants = sharedStore.getParticipants();
+
+		// Update voting state from shared store
+		const votingState = sharedStore.getVotingState();
+		votingInProgress = votingState.votingInProgress;
+		votesRevealed = votingState.votesRevealed;
+		voteAverage = votingState.voteAverage;
+		finalEstimate = votingState.finalEstimate;
+	}
+
 	function saveSessionState() {
-		localStorage.setItem(`session_${sessionCode}_participants`, JSON.stringify(participants));
-		localStorage.setItem(
-			`session_${sessionCode}_voting`,
-			JSON.stringify({
+		// Save individual session settings (not shared)
+		localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
+
+		// Update shared state
+		if (sharedStore) {
+			sharedStore.updateVotingState({
 				votingInProgress,
 				votesRevealed,
 				voteAverage,
 				finalEstimate
-			})
-		);
-		// Save observer status
-		localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
+			});
+		}
 	}
 
 	function toggleObserverMode() {
 		isObserver = !isObserver;
-		const participantIndex = participants.findIndex((p) => p.name === playerName);
-		if (participantIndex !== -1) {
-			participants[participantIndex].isObserver = isObserver;
+
+		// Update shared store
+		if (sharedStore) {
+			const updates: Partial<Participant> = { isObserver };
 			// Clear vote if becoming observer
 			if (isObserver) {
-				participants[participantIndex].voted = false;
-				participants[participantIndex].vote = undefined;
+				updates.voted = false;
+				updates.vote = undefined;
 				selectedVote = null;
 			}
-			saveSessionState();
+			sharedStore.updateParticipantStatus(updates);
 		}
+
+		saveSessionState();
 	}
 
 	function exitSession() {
@@ -152,21 +159,38 @@
 		if (isObserver) return; // Observers cannot vote
 
 		selectedVote = vote;
-		const participantIndex = participants.findIndex((p) => p.name === playerName);
-		if (participantIndex !== -1) {
-			participants[participantIndex].voted = true;
-			participants[participantIndex].vote = vote;
-			saveSessionState();
+
+		// Update shared store
+		if (sharedStore) {
+			sharedStore.updateParticipantStatus({
+				voted: true,
+				vote: vote
+			});
 		}
+
+		saveSessionState();
 	}
 
 	function startNewVoting() {
+		if (!isHost) return;
+
 		votingInProgress = true;
 		votesRevealed = false;
 		selectedVote = null;
 		voteAverage = '';
 		finalEstimate = '';
-		participants = participants.map((p) => ({ ...p, voted: false, vote: undefined }));
+
+		// Reset all participants' votes in shared store
+		if (sharedStore) {
+			const resetParticipants = sharedStore.getParticipants().map((p) => ({
+				...p,
+				voted: false,
+				vote: undefined,
+				lastSeen: Date.now()
+			}));
+			sharedStore.updateParticipants(resetParticipants);
+		}
+
 		saveSessionState();
 	}
 
@@ -174,14 +198,18 @@
 		if (!isHost) return;
 
 		votesRevealed = true;
-		// Only include votes from active participants (not observers)
-		const votes = participants
+
+		// Calculate average from shared participants
+		const currentParticipants = sharedStore?.getParticipants() || [];
+		const votes = currentParticipants
 			.filter((p) => !p.isObserver && p.vote && p.vote !== '?' && !isNaN(parseFloat(p.vote)))
 			.map((p) => parseFloat(p.vote!));
+
 		if (votes.length > 0) {
 			const average = votes.reduce((sum, vote) => sum + vote, 0) / votes.length;
 			voteAverage = average.toFixed(1);
 		}
+
 		saveSessionState();
 	}
 
