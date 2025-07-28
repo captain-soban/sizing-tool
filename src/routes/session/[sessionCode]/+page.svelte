@@ -18,6 +18,8 @@
 	let selectedVote = $state<string | null>(null);
 	let voteAverage = $state<string>('');
 	let finalEstimate = $state<string>('');
+	let editingTitle = $state(false);
+	let tempTitle = $state('');
 
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
 
@@ -167,6 +169,26 @@
 		saveSessionState();
 	}
 
+	function startEditingTitle() {
+		if (!isHost) return;
+		editingTitle = true;
+		tempTitle = sessionTitle;
+	}
+
+	function saveTitle() {
+		if (tempTitle.trim()) {
+			sessionTitle = tempTitle.trim();
+			localStorage.setItem(`session_${sessionCode}_title`, sessionTitle);
+		}
+		editingTitle = false;
+		tempTitle = '';
+	}
+
+	function cancelEditTitle() {
+		editingTitle = false;
+		tempTitle = '';
+	}
+
 	function getParticipantPosition(index: number, total: number) {
 		const angle = (index * 360) / total - 90;
 		const radius = 35;
@@ -201,57 +223,148 @@
 			>
 				<!-- Table Center Area -->
 				<div class="absolute inset-0 flex flex-col items-center justify-center">
-					<Card class="work-area max-w-xs text-center">
+					<Card class="work-area max-w-sm text-center">
 						<CardContent class="p-6">
-							<h2 class="text-poker-blue mb-4 text-xl font-bold">{sessionTitle}</h2>
+							<!-- Session Title -->
+							{#if editingTitle}
+								<div class="mb-4 space-y-2">
+									<input
+										type="text"
+										bind:value={tempTitle}
+										class="w-full rounded border p-2 text-center text-lg font-bold"
+										placeholder="Enter session title"
+										autofocus
+										onkeydown={(e) => {
+											if (e.key === 'Enter') saveTitle();
+											if (e.key === 'Escape') cancelEditTitle();
+										}}
+									/>
+									<div class="flex justify-center gap-2">
+										<Button
+											onclick={saveTitle}
+											size="sm"
+											class="bg-green-500 text-white hover:bg-green-600"
+										>
+											Save
+										</Button>
+										<Button
+											onclick={cancelEditTitle}
+											variant="outline"
+											size="sm"
+											class="btn-poker-gray"
+										>
+											Cancel
+										</Button>
+									</div>
+								</div>
+							{:else}
+								<div class="group mb-4">
+									<h2
+										class="text-poker-blue hover:text-poker-blue/80 cursor-pointer text-xl font-bold transition-colors"
+										onclick={startEditingTitle}
+										title={isHost ? 'Click to edit title' : 'Session title'}
+									>
+										{sessionTitle}
+										{#if isHost}
+											<span
+												class="ml-2 text-sm opacity-0 transition-opacity group-hover:opacity-100"
+												>✏️</span
+											>
+										{/if}
+									</h2>
+								</div>
+							{/if}
+
+							<!-- Voting Status and Results -->
 							{#if votesRevealed && voteAverage}
-								<div class="space-y-2">
-									<p class="text-muted-foreground text-sm">Average:</p>
-									<p class="text-poker-red text-3xl font-bold">{voteAverage}</p>
+								<div class="space-y-3">
+									<p class="text-muted-foreground text-sm">Team Average:</p>
+									<p class="text-poker-red bounce-in text-4xl font-bold">{voteAverage}</p>
+
 									{#if isHost && !finalEstimate}
-										<div class="mt-4 flex gap-2">
-											<Button
-												onclick={acceptEstimate}
-												size="sm"
-												class="bg-poker-blue hover:bg-poker-blue/90"
-											>
-												Accept
-											</Button>
-											<Button
-												onclick={startNewVoting}
-												variant="outline"
-												size="sm"
-												class="btn-poker-gray"
-											>
-												Re-vote
-											</Button>
+										<div class="mt-4 space-y-2">
+											<div class="flex justify-center gap-2">
+												<Button
+													onclick={acceptEstimate}
+													class="bg-green-500 text-white hover:bg-green-600"
+												>
+													✓ Accept {voteAverage}
+												</Button>
+											</div>
+											<div class="flex justify-center gap-2">
+												<Button
+													onclick={startNewVoting}
+													variant="outline"
+													size="sm"
+													class="btn-poker-gray"
+												>
+													🔄 Re-vote
+												</Button>
+												<Button
+													onclick={() => {
+														const customValue = prompt('Enter custom estimate:', voteAverage);
+														if (customValue && customValue.trim()) {
+															finalEstimate = customValue.trim();
+															votingInProgress = false;
+															saveSessionState();
+														}
+													}}
+													variant="outline"
+													size="sm"
+													class="btn-poker-gray"
+												>
+													✏️ Custom
+												</Button>
+											</div>
 										</div>
 									{/if}
+
 									{#if finalEstimate}
-										<div class="mt-4 rounded-md bg-green-100 p-2">
-											<p class="text-sm text-green-800">
-												Final Estimate: <strong>{finalEstimate}</strong>
+										<div class="mt-4 rounded-md border-2 border-green-300 bg-green-100 p-3">
+											<p class="font-medium text-green-800">
+												Final Estimate: <span class="text-2xl font-bold">{finalEstimate}</span>
 											</p>
+											{#if isHost}
+												<Button
+													onclick={() => {
+														finalEstimate = '';
+														saveSessionState();
+													}}
+													variant="outline"
+													size="sm"
+													class="mt-2 text-xs"
+												>
+													Reset
+												</Button>
+											{/if}
 										</div>
 									{/if}
 								</div>
 							{:else if votingInProgress}
-								<p class="text-muted-foreground">Voting in progress...</p>
-								{#if isHost}
-									<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90 mt-4">
-										Reveal Votes
-									</Button>
-								{/if}
+								<div class="space-y-3">
+									<p class="text-muted-foreground">🗳️ Voting in progress...</p>
+									<div class="text-sm text-gray-600">
+										{participants.filter((p) => !p.isObserver && p.voted).length} / {participants.filter(
+											(p) => !p.isObserver
+										).length} votes cast
+									</div>
+									{#if isHost}
+										<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90">
+											🎭 Reveal Votes
+										</Button>
+									{/if}
+								</div>
 							{:else}
-								<p class="text-muted-foreground">Ready to start voting</p>
-								{#if isHost}
-									<Button
-										onclick={startNewVoting}
-										class="bg-poker-blue hover:bg-poker-blue/90 mt-4"
-									>
-										Start Voting
-									</Button>
-								{/if}
+								<div class="space-y-3">
+									<p class="text-muted-foreground">Ready to start voting</p>
+									{#if isHost}
+										<Button onclick={startNewVoting} class="bg-poker-blue hover:bg-poker-blue/90">
+											🚀 Start Voting
+										</Button>
+									{:else}
+										<p class="text-sm text-gray-500">Waiting for host to start...</p>
+									{/if}
+								</div>
 							{/if}
 						</CardContent>
 					</Card>
@@ -282,18 +395,30 @@
 									<div class="flex justify-center">
 										{#if participant.isObserver}
 											<div class="rounded-md bg-orange-100 px-3 py-1 text-xs text-orange-600">
-												Observer
+												👁️ Observer
 											</div>
 										{:else if votesRevealed && participant.vote}
-											<div class="bg-poker-blue rounded-md px-3 py-1 font-bold text-white">
+											<div
+												class="bounce-in bg-poker-blue rounded-md px-3 py-1 font-bold text-white"
+											>
 												{participant.vote}
 											</div>
 										{:else if participant.voted}
-											<div class="rounded-md bg-gray-300 px-3 py-1">✓</div>
+											<div
+												class="bounce-in rounded-md bg-green-500 px-3 py-1 font-medium text-white"
+											>
+												✓ Voted
+											</div>
 										{:else if votingInProgress}
-											<div class="rounded-md bg-gray-100 px-3 py-1 text-gray-400">—</div>
+											<div
+												class="thinking rounded-md bg-yellow-100 px-3 py-1 text-sm text-yellow-700"
+											>
+												🤔 Thinking...
+											</div>
 										{:else}
-											<div class="rounded-md bg-gray-100 px-3 py-1 text-gray-400">Ready</div>
+											<div class="rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-500">
+												Ready
+											</div>
 										{/if}
 									</div>
 								</CardContent>
