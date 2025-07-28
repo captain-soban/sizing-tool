@@ -3,18 +3,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
+	import { generateSessionCode } from '$lib/stores/session';
 
 	let sessionCode = $state('');
 	let playerName = $state('');
-
-	function generateSessionCode(): string {
-		const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-		let code = '';
-		for (let i = 0; i < 8; i++) {
-			code += chars.charAt(Math.floor(Math.random() * chars.length));
-		}
-		return code;
-	}
 
 	function createSession() {
 		const code = generateSessionCode();
@@ -39,12 +31,10 @@
 	}
 </script>
 
-<div
-	class="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4"
->
-	<Card class="w-full max-w-md">
+<div class="flex min-h-screen items-center justify-center p-4">
+	<Card class="work-area w-full max-w-md">
 		<CardHeader>
-			<CardTitle class="text-center text-3xl font-bold">Planning Poker</CardTitle>
+			<CardTitle class="text-poker-blue text-center text-3xl font-bold">Planning Poker</CardTitle>
 		</CardHeader>
 		<CardContent class="space-y-6">
 			<div class="space-y-2">
@@ -53,16 +43,20 @@
 			</div>
 
 			<div class="space-y-4">
-				<Button onclick={createSession} disabled={!playerName.trim()} class="w-full">
+				<Button
+					onclick={createSession}
+					disabled={!playerName.trim()}
+					class="bg-poker-blue hover:bg-poker-blue/90 w-full"
+				>
 					Create New Session
 				</Button>
 
 				<div class="relative">
 					<div class="absolute inset-0 flex items-center">
-						<div class="w-full border-t border-gray-300"></div>
+						<div class="w-full border-t"></div>
 					</div>
 					<div class="relative flex justify-center text-sm">
-						<span class="bg-white px-2 text-gray-500">or</span>
+						<span class="text-muted-foreground bg-white px-2">or</span>
 					</div>
 				</div>
 
@@ -82,8 +76,7 @@
 				<Button
 					onclick={joinSession}
 					disabled={!playerName.trim() || sessionCode.length !== 8}
-					variant="secondary"
-					class="w-full"
+					class="btn-poker-gray w-full"
 				>
 					Join Session
 				</Button>
