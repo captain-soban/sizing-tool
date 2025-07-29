@@ -25,6 +25,14 @@ export interface VotingState {
 	finalEstimate: string;
 }
 
+export interface RecentSession {
+	sessionCode: string;
+	playerName: string;
+	sessionTitle?: string;
+	isHost: boolean;
+	lastAccessed: number;
+}
+
 export const defaultStoryPointScales = {
 	fibonacci_0_8: ['0', '1', '2', '3', '5', '8', '?'],
 	fibonacci_1_8: ['1', '2', '3', '5', '8', '?'],
@@ -68,6 +76,118 @@ export function generateSessionCode(): string {
 		code += chars.charAt(Math.floor(Math.random() * chars.length));
 	}
 	return code;
+}
+
+// Recent sessions management
+const RECENT_SESSIONS_KEY = 'recentSessions';
+const MAX_RECENT_SESSIONS = 10;
+
+export function getRecentSessions(): RecentSession[] {
+	if (typeof localStorage === 'undefined') return [];
+
+	const stored = localStorage.getItem(RECENT_SESSIONS_KEY);
+	if (!stored) return [];
+
+	try {
+		const sessions: RecentSession[] = JSON.parse(stored);
+		// Sort by last accessed, most recent first
+		return sessions.sort((a, b) => b.lastAccessed - a.lastAccessed);
+	} catch {
+		return [];
+	}
+}
+
+export function addRecentSession(sessionData: Omit<RecentSession, 'lastAccessed'>): void {
+	if (typeof localStorage === 'undefined') return;
+
+	const recentSessions = getRecentSessions();
+	const existingIndex = recentSessions.findIndex(
+		(s) => s.sessionCode === sessionData.sessionCode && s.playerName === sessionData.playerName
+	);
+
+	const sessionWithTimestamp: RecentSession = {
+		...sessionData,
+		lastAccessed: Date.now()
+	};
+
+	if (existingIndex >= 0) {
+		// Update existing session
+		recentSessions[existingIndex] = sessionWithTimestamp;
+	} else {
+		// Add new session at the beginning
+		recentSessions.unshift(sessionWithTimestamp);
+	}
+
+	// Limit to MAX_RECENT_SESSIONS
+	const limitedSessions = recentSessions.slice(0, MAX_RECENT_SESSIONS);
+
+	localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(limitedSessions));
+}
+
+export function removeRecentSession(sessionCode: string, playerName: string): void {
+	if (typeof localStorage === 'undefined') return;
+
+	const recentSessions = getRecentSessions();
+	const filtered = recentSessions.filter(
+		(s) => !(s.sessionCode === sessionCode && s.playerName === playerName)
+	);
+
+	localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(filtered));
+}
+
+export function clearRecentSessions(): void {
+	if (typeof localStorage === 'undefined') return;
+	localStorage.removeItem(RECENT_SESSIONS_KEY);
+}
+
+export function updateRecentSessionTitle(
+	sessionCode: string,
+	playerName: string,
+	title: string
+): void {
+	if (typeof localStorage === 'undefined') return;
+
+	const recentSessions = getRecentSessions();
+	const sessionIndex = recentSessions.findIndex(
+		(s) => s.sessionCode === sessionCode && s.playerName === playerName
+	);
+
+	if (sessionIndex >= 0) {
+		recentSessions[sessionIndex].sessionTitle = title;
+		localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(recentSessions));
+	}
+}
+
+// Migration utility to convert old localStorage format to new recent sessions format
+export function migrateOldSessionData(): void {
+	if (typeof localStorage === 'undefined') return;
+
+	const sessionCode = localStorage.getItem('sessionCode');
+	const playerName = localStorage.getItem('playerName');
+	const isHost = localStorage.getItem('isHost') === 'true';
+
+	if (sessionCode && playerName) {
+		// Check if we already have recent sessions data
+		const existingSessions = getRecentSessions();
+		const hasExisting = existingSessions.some(
+			(s) => s.sessionCode === sessionCode && s.playerName === playerName
+		);
+
+		if (!hasExisting) {
+			// Add the old session data to recent sessions
+			addRecentSession({
+				sessionCode,
+				playerName,
+				isHost,
+				sessionTitle: undefined
+			});
+		}
+
+		// Clean up old format
+		localStorage.removeItem('sessionCode');
+		localStorage.removeItem('playerName');
+		localStorage.removeItem('isHost');
+	}
 }
 
 // Shared session management for multi-user functionality

@@ -74,6 +74,9 @@ The app follows this user journey:
 ### Session Management
 
 - **Session Creation**: Generates 8-digit alphanumeric codes (excluding '0' and 'o')
+- **Recent Sessions**: Tracks up to 10 recent sessions with quick-access cards on landing page
+- **Session History**: Displays session title, code, role (host/participant), and last accessed time
+- **Quick Rejoin**: One-click access to recent sessions without re-entering codes or names
 - **Data Storage**: Server-side session storage with real-time synchronization
 - **User Roles**: Distinguishes between session owner (host) and participants
 - **Session Title**: Each session has a title (sprint cycle, epic, or feature name)
@@ -102,6 +105,8 @@ The app follows this user journey:
 - PostgreSQL database for persistent session storage
 - Session state includes: codes, participant names, votes, scales, session titles
 - Support for resuming sessions using 8-digit codes
+- **Recent Sessions Storage**: localStorage-based recent sessions with automatic migration from legacy format
+- **Session Preferences**: Per-session user preferences (observer mode, story point scales) stored locally
 - Anonymous mode support (nicknames instead of real names)
 - Real-time updates via Server-Sent Events (SSE)
 - Automatic cleanup of inactive participants and old sessions
