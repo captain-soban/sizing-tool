@@ -1,1 +1,164 @@
 @import 'tailwindcss';
+
+/* Red, White, Blue Theme for Planning Poker App */
+:root {
+	--background: 0 0% 100%;
+	--foreground: 222.2 84% 4.9%;
+	--card: 0 0% 100%;
+	--card-foreground: 222.2 84% 4.9%;
+	--popover: 0 0% 100%;
+	--popover-foreground: 222.2 84% 4.9%;
+	--primary: 221.2 83.2% 53.3%;
+	--primary-foreground: 210 40% 98%;
+	--secondary: 210 40% 96%;
+	--secondary-foreground: 222.2 84% 4.9%;
+	--muted: 210 40% 96%;
+	--muted-foreground: 215.4 16.3% 46.9%;
+	--accent: 210 40% 96%;
+	--accent-foreground: 222.2 84% 4.9%;
+	--destructive: 0 84.2% 60.2%;
+	--destructive-foreground: 210 40% 98%;
+	--border: 214.3 31.8% 91.4%;
+	--input: 214.3 31.8% 91.4%;
+	--ring: 221.2 83.2% 53.3%;
+	--radius: 0.5rem;
+
+	/* Custom Planning Poker Theme Variables */
+	--poker-red: 0 84.2% 60.2%;
+	--poker-blue: 221.2 83.2% 53.3%;
+	--poker-navy: 225 71% 28%;
+	--poker-white: 0 0% 100%;
+	--poker-work-area: 0 0% 100%;
+	--poker-gray-button: 214.3 31.8% 91.4%;
+	--poker-button-text: 222.2 84% 4.9%;
+}
+
+.dark {
+	--background: 222.2 84% 4.9%;
+	--foreground: 210 40% 98%;
+	--card: 222.2 84% 4.9%;
+	--card-foreground: 210 40% 98%;
+	--popover: 222.2 84% 4.9%;
+	--popover-foreground: 210 40% 98%;
+	--primary: 217.2 91.2% 59.8%;
+	--primary-foreground: 222.2 84% 4.9%;
+	--secondary: 217.2 32.6% 17.5%;
+	--secondary-foreground: 210 40% 98%;
+	--muted: 217.2 32.6% 17.5%;
+	--muted-foreground: 215 20.2% 65.1%;
+	--accent: 217.2 32.6% 17.5%;
+	--accent-foreground: 210 40% 98%;
+	--destructive: 0 62.8% 30.6%;
+	--destructive-foreground: 210 40% 98%;
+	--border: 217.2 32.6% 17.5%;
+	--input: 217.2 32.6% 17.5%;
+	--ring: 224.3 76.3% 94.1%;
+}
+
+/* Global App Styling */
+body {
+	background: linear-gradient(
+		135deg,
+		hsl(var(--poker-blue)) 0%,
+		hsl(var(--poker-white)) 50%,
+		hsl(var(--poker-red)) 100%
+	);
+	min-height: 100vh;
+}
+
+/* Work Area Styling */
+.work-area {
+	background: hsl(var(--poker-work-area));
+	border-radius: var(--radius);
+	box-shadow:
+		0 4px 6px -1px rgb(0 0 0 / 0.1),
+		0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Custom Button Variants for Gray Buttons */
+.btn-poker-gray {
+	background-color: hsl(var(--poker-gray-button));
+	color: hsl(var(--poker-button-text));
+	border: 1px solid hsl(var(--border));
+	transition: all 0.2s ease-in-out;
+}
+
+.btn-poker-gray:hover {
+	background-color: hsl(var(--poker-gray-button) / 0.8);
+	transform: translateY(-1px);
+}
+
+/* Custom Red/Blue Accent Classes */
+.text-poker-red {
+	color: hsl(var(--poker-red));
+}
+
+.text-poker-blue {
+	color: hsl(var(--poker-blue));
+}
+
+.bg-poker-red {
+	background-color: hsl(var(--poker-red));
+}
+
+.bg-poker-blue {
+	background-color: hsl(var(--poker-blue));
+}
+
+.border-poker-red {
+	border-color: hsl(var(--poker-red));
+}
+
+.border-poker-blue {
+	border-color: hsl(var(--poker-blue));
+}
+
+/* Voting Animations */
+@keyframes pulse-vote {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.1);
+		opacity: 0.8;
+	}
+}
+
+@keyframes bounce-in {
+	0% {
+		transform: scale(0.3);
+		opacity: 0;
+	}
+	50% {
+		transform: scale(1.1);
+		opacity: 0.8;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes thinking {
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+.pulse-vote {
+	animation: pulse-vote 2s infinite;
+}
+
+.bounce-in {
+	animation: bounce-in 0.6s ease-out;
+}
+
+.thinking {
+	animation: thinking 1.5s ease-in-out infinite;
+}

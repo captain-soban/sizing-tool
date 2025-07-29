@@ -1,95 +1,130 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { Button } from '$lib/components/ui/button';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
+	import { SessionClient } from '$lib/api/sessionClient';
 
 	let sessionCode = $state('');
 	let playerName = $state('');
+	let isCreating = $state(false);
+	let isJoining = $state(false);
+	let error = $state('');
 
-	function generateSessionCode(): string {
-		const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-		let code = '';
-		for (let i = 0; i < 8; i++) {
-			code += chars.charAt(Math.floor(Math.random() * chars.length));
+	const sessionClient = new SessionClient();
+
+	async function createSession() {
+		if (!playerName.trim()) return;
+
+		isCreating = true;
+		error = '';
+
+		try {
+			const session = await sessionClient.createSession(playerName.trim());
+			localStorage.setItem('sessionCode', session.sessionCode);
+			localStorage.setItem('playerName', playerName.trim());
+			localStorage.setItem('isHost', 'true');
+			goto(`/session/${session.sessionCode}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to create session';
+			console.error('[Landing] Error creating session:', err);
+		} finally {
+			isCreating = false;
 		}
-		return code;
 	}
 
-	function createSession() {
-		const code = generateSessionCode();
-		localStorage.setItem('sessionCode', code);
-		localStorage.setItem('playerName', playerName);
-		localStorage.setItem('isHost', 'true');
-		goto(`/session/${code}`);
-	}
+	async function joinSession() {
+		if (sessionCode.length !== 8 || !playerName.trim()) return;
 
-	function joinSession() {
-		if (sessionCode.length === 8 && playerName.trim()) {
-			localStorage.setItem('sessionCode', sessionCode.toUpperCase());
-			localStorage.setItem('playerName', playerName);
+		isJoining = true;
+		error = '';
+
+		try {
+			const upperSessionCode = sessionCode.toUpperCase();
+			await sessionClient.joinSession(upperSessionCode, playerName.trim());
+			localStorage.setItem('sessionCode', upperSessionCode);
+			localStorage.setItem('playerName', playerName.trim());
 			localStorage.setItem('isHost', 'false');
-			goto(`/session/${sessionCode.toUpperCase()}`);
+			goto(`/session/${upperSessionCode}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to join session';
+			console.error('[Landing] Error joining session:', err);
+		} finally {
+			isJoining = false;
 		}
+	}
+
+	function handleSessionCodeInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		sessionCode = target.value.toUpperCase();
 	}
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-	<div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-		<h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Planning Poker</h1>
-		
-		<div class="space-y-6">
-			<div>
-				<label for="playerName" class="block text-sm font-medium text-gray-700 mb-2">
-					Your Name
-				</label>
-				<input
-					id="playerName"
-					type="text"
-					bind:value={playerName}
-					placeholder="Enter your name"
-					class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-				/>
+<div class="flex min-h-screen items-center justify-center p-4">
+	<Card class="work-area w-full max-w-md">
+		<CardHeader>
+			<CardTitle class="text-poker-blue text-center text-3xl font-bold">Planning Poker</CardTitle>
+		</CardHeader>
+		<CardContent class="space-y-6">
+			<!-- Error Message -->
+			{#if error}
+				<div class="rounded-md bg-red-100 p-3 text-sm text-red-800">
+					{error}
+				</div>
+			{/if}
+
+			<div class="space-y-2">
+				<label for="playerName" class="text-sm font-medium"> Your Name </label>
+				<Input id="playerName" type="text" bind:value={playerName} placeholder="Enter your name" />
 			</div>
 
 			<div class="space-y-4">
-				<button
+				<Button
 					onclick={createSession}
-					disabled={!playerName.trim()}
-					class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+					disabled={!playerName.trim() || isCreating || isJoining}
+					class="bg-poker-blue hover:bg-poker-blue/90 w-full"
 				>
-					Create New Session
-				</button>
+					{#if isCreating}
+						Creating...
+					{:else}
+						Create New Session
+					{/if}
+				</Button>
 
 				<div class="relative">
 					<div class="absolute inset-0 flex items-center">
-						<div class="w-full border-t border-gray-300"></div>
+						<div class="w-full border-t"></div>
 					</div>
 					<div class="relative flex justify-center text-sm">
-						<span class="px-2 bg-white text-gray-500">or</span>
+						<span class="text-muted-foreground bg-white px-2">or</span>
 					</div>
 				</div>
 
-				<div>
-					<label for="sessionCode" class="block text-sm font-medium text-gray-700 mb-2">
-						Session Code
-					</label>
-					<input
+				<div class="space-y-2">
+					<label for="sessionCode" class="text-sm font-medium"> Session Code </label>
+					<Input
 						id="sessionCode"
 						type="text"
 						bind:value={sessionCode}
 						placeholder="Enter 8-digit code"
-						maxlength="8"
-						class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-						oninput={() => sessionCode = sessionCode.toUpperCase()}
+						maxlength={8}
+						class="uppercase"
+						oninput={handleSessionCodeInput}
 					/>
 				</div>
 
-				<button
+				<Button
 					onclick={joinSession}
-					disabled={!playerName.trim() || sessionCode.length !== 8}
-					class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+					disabled={!playerName.trim() || sessionCode.length !== 8 || isCreating || isJoining}
+					class="btn-poker-gray w-full"
 				>
-					Join Session
-				</button>
+					{#if isJoining}
+						Joining...
+					{:else}
+						Join Session
+					{/if}
+				</Button>
 			</div>
-		</div>
-	</div>
+		</CardContent>
+	</Card>
 </div>
