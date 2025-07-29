@@ -1,13 +1,16 @@
 # Copilot Instructions for sizing-tool
 
 ## Project Overview
+
 - This is a planning poker/story point sizing tool built with Svelte 5, SvelteKit and shadcn-svelte UI.
 - The app is entirely client-side with no backend, using localStorage for data persistence.
 - Designed for real-time story point sizing in agile teams.
 - Features anonymous voting, configurable point scales, and session management.
 
 ## Key Architecture & Patterns
+
 ### Core Components
+
 - Source code in `src/`:
   - `lib/` contains shared utilities, stores, and UI components
   - `routes/` contains SvelteKit pages for session management and sizing
@@ -15,6 +18,7 @@
 - UI uses shadcn-svelte components with Tailwind CSS
 
 ### Data Flow
+
 - Session data stored in localStorage using `localStore.ts`
 - Each sizing session has:
   - 8-digit alphanumeric session code (excluding 0 and 'o')
@@ -24,11 +28,13 @@
   - Voting state and results
 
 ## Developer Workflows
+
 - **Development:** `npm run dev` starts dev server
 - **Build/Preview:** `npm run build` and `npm run preview`
 - **Tests:** Unit tests with Vitest, E2E with Playwright
 
 ## Project-Specific Conventions
+
 1. **Session Management**
    - Generate 8-digit codes excluding '0' and 'o'
    - Store session state in localStorage
@@ -52,12 +58,14 @@
    - Support anonymous voting mode
 
 ## Key Files
+
 - `/src/routes/+page.svelte`: Landing page with session creation/join
 - `/src/lib/localStore.ts`: Local storage management
 - `/src/routes/admin.svelte`: Admin interface for localStorage management
-- 
+-
 
 ## Testing Guidelines
+
 - Test session code generation
 - Validate point scale configurations
 - Verify localStorage persistence
