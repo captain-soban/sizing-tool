@@ -8,6 +8,7 @@ export interface ServerSession {
 	storyPointScale: string[];
 	createdAt: Date;
 	lastUpdated: Date;
+	lastActivity?: string;
 }
 
 // In-memory storage for sessions
@@ -183,6 +184,16 @@ export class ServerSessionStore {
 		return Array.from(sessions.values());
 	}
 
+	static deleteSession(sessionCode: string): boolean {
+		const deleted = sessions.delete(sessionCode);
+		if (deleted) {
+			console.log(`[ServerSessionStore] Deleted session ${sessionCode}`);
+		} else {
+			console.log(`[ServerSessionStore] Session ${sessionCode} not found for deletion`);
+		}
+		return deleted;
+	}
+
 	static cleanup(): void {
 		const now = Date.now();
 		const expiredSessions: string[] = [];
@@ -211,3 +222,44 @@ setInterval(
 	},
 	60 * 60 * 1000
 );
+
+// Admin interface
+export interface AdminSessionStore {
+	getAllSessions(): Promise<ServerSession[]>;
+	deleteSession(sessionCode: string): Promise<boolean>;
+	updateSession(
+		sessionCode: string,
+		updates: Partial<ServerSession>
+	): Promise<ServerSession | null>;
+	getSession(sessionCode: string): Promise<ServerSession | null>;
+}
+
+class AdminSessionStoreImpl implements AdminSessionStore {
+	async getAllSessions(): Promise<ServerSession[]> {
+		return ServerSessionStore.getAllSessions();
+	}
+
+	async deleteSession(sessionCode: string): Promise<boolean> {
+		return ServerSessionStore.deleteSession(sessionCode);
+	}
+
+	async updateSession(
+		sessionCode: string,
+		updates: Partial<ServerSession>
+	): Promise<ServerSession | null> {
+		const session = ServerSessionStore.getSession(sessionCode);
+		if (!session) return null;
+
+		Object.assign(session, updates);
+		session.lastUpdated = new Date();
+		return session;
+	}
+
+	async getSession(sessionCode: string): Promise<ServerSession | null> {
+		return ServerSessionStore.getSession(sessionCode);
+	}
+}
+
+export function getSessionStore(): AdminSessionStore {
+	return new AdminSessionStoreImpl();
+}

@@ -7,12 +7,16 @@ A real-time Planning Poker application for agile development teams, built with S
 ## Features
 
 - **Real-time Multi-User Sessions** - Participants see each other join, vote, and update status live
-- **Session Management** - Create and join sessions using 8-digit codes
+- **Smart Session Management** - Create and join sessions using 8-digit codes with recent session tracking
+- **Recent Sessions UI** - Elegant card-based interface for quick access to up to 10 recent sessions
 - **Flexible Voting Scales** - Fibonacci, T-shirt sizes, linear, and custom scales
 - **Observer & Participant Modes** - Toggle between active voting and observing
-- **Session Persistence** - PostgreSQL database stores all session data
+- **Session Persistence** - PostgreSQL database stores all session data with smart tracking
 - **Responsive Design** - Works seamlessly on desktop and mobile devices
 - **Anonymous Support** - Use real names or nicknames for privacy
+- **Admin Dashboard** - Comprehensive admin interface for session monitoring and management
+- **Docker Support** - Full containerization with Docker and Docker Compose
+- **Real-time Statistics** - Live monitoring of sessions, participants, and activity
 
 ## Technology Stack
 
@@ -25,13 +29,25 @@ A real-time Planning Poker application for agile development teams, built with S
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Docker (Recommended)
 
-- Node.js 18+ 
-- PostgreSQL 12+
-- npm or yarn
+**Prerequisites**: Docker and Docker Compose
 
-### Installation
+1. **Clone and start**
+   ```bash
+   git clone <repository-url>
+   cd sizing-tool
+   npm run docker:up
+   ```
+
+2. **Open your browser**
+   Navigate to `http://localhost:3000`
+
+That's it! PostgreSQL and the app are running in containers.
+
+### Option 2: Local Development
+
+**Prerequisites**: Node.js 18+, PostgreSQL 12+, npm or yarn
 
 1. **Clone the repository**
    ```bash
@@ -106,9 +122,15 @@ export NODE_ENV=production
 
 ### Joining a Session
 
+**New Session:**
 1. Enter your name and the 8-digit session code
 2. Click "Join Session"
 3. Toggle between Observer and Participant modes as needed
+
+**Recent Session (Quick Access):**
+1. Click on any recent session card from the landing page
+2. Automatically rejoin with saved name and session details
+3. No need to re-enter session codes or names
 
 ### Planning Poker Process
 
@@ -117,10 +139,19 @@ export NODE_ENV=production
 3. **Reveal Votes** - Host reveals all votes and shows average
 4. **Accept or Re-vote** - Host can accept the average or start a new round
 
+### Admin Dashboard
+
+1. **Access Admin Panel** - Navigate to `/admin` for session management
+2. **Monitor Sessions** - View real-time statistics and session overview
+3. **Manage Sessions** - Terminate active sessions or delete old ones
+4. **View Participants** - See detailed participant information and online status
+5. **Search Sessions** - Filter by session code, title, or host name
+
 ## Development
 
 ### Available Scripts
 
+#### Local Development
 ```bash
 npm run dev          # Start development server
 npm run build        # Build for production
@@ -133,6 +164,15 @@ npm run format       # Format code with Prettier
 npm run check        # TypeScript type checking
 npm run db:setup     # Create PostgreSQL database
 npm run db:reset     # Reset database (removes all data)
+```
+
+#### Docker Commands
+```bash
+npm run docker:up    # Start app and PostgreSQL with docker-compose
+npm run docker:down  # Stop and remove containers
+npm run docker:logs  # View container logs
+npm run docker:build # Build Docker image only
+npm run docker:run   # Run app container only (requires external DB)
 ```
 
 ### Project Structure
@@ -174,11 +214,17 @@ Client B ──► API Route ──► PostgreSQL ──► SSE Broadcast ──
 
 ### API Endpoints
 
+#### Session Management
 - `POST /api/sessions` - Create new session
 - `POST /api/sessions/[code]/join` - Join existing session  
 - `PATCH /api/sessions/[code]/participants/[name]` - Update participant
 - `PATCH /api/sessions/[code]/voting` - Update voting state
 - `GET /api/sessions/[code]/events` - Server-Sent Events stream
+
+#### Admin API
+- `GET /api/admin/sessions` - Get all sessions with statistics
+- `DELETE /api/admin/sessions/[code]` - Delete specific session
+- `POST /api/admin/sessions/[code]/terminate` - Terminate active session
 
 ## Configuration
 
@@ -264,44 +310,35 @@ This application can be deployed to various platforms with automatic database se
 
 #### 🐳 Docker Deployment
 
-1. **Create production environment file:**
+**Quick Docker deployment** (includes PostgreSQL):
+
+1. **Clone and deploy:**
    ```bash
-   # .env.production
-   DATABASE_URL=postgresql://user:password@postgres:5432/planning_poker
-   NODE_ENV=production
+   git clone <repository-url>
+   cd sizing-tool
+   npm run docker:up
    ```
 
-2. **Use Docker Compose:**
+2. **Access your app at `http://localhost:3000`**
+
+**Custom Docker deployment:**
+
+1. **Edit docker-compose.yml for production:**
    ```yaml
-   # docker-compose.yml
-   version: '3.8'
-   services:
-     app:
-       build: .
-       ports:
-         - "3000:3000"
-       environment:
-         - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/planning_poker
-         - NODE_ENV=production
-       depends_on:
-         - postgres
-     
-     postgres:
-       image: postgres:15
-       environment:
-         POSTGRES_DB: planning_poker
-         POSTGRES_USER: postgres
-         POSTGRES_PASSWORD: postgres
-       volumes:
-         - postgres_data:/var/lib/postgresql/data
-   
-   volumes:
-     postgres_data:
+   # Update environment variables in docker-compose.yml
+   environment:
+     - DATABASE_URL=postgresql://postgres:your_secure_password@db:5432/planning_poker
+     - NODE_ENV=production
    ```
 
-3. **Deploy:**
+2. **Deploy:**
    ```bash
    docker-compose up -d
+   ```
+
+3. **View logs:**
+   ```bash
+   npm run docker:logs
    ```
 
 #### 🖥️ VPS/Traditional Server

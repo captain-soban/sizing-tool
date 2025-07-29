@@ -5,6 +5,7 @@ export interface Participant {
 	isHost: boolean;
 	isObserver?: boolean;
 	lastSeen?: number;
+	isConnected?: boolean;
 }
 
 export interface SessionState {
