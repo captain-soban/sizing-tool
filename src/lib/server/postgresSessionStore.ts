@@ -315,32 +315,91 @@ export class PostgresSessionStore {
 		const pool = getPool();
 
 		try {
-			const result = await pool.query(`
-				SELECT session_code, title, created_at, updated_at,
-					   COUNT(p.name) as participant_count
+			// Get all sessions with their basic info
+			const sessionsResult = await pool.query(`
+				SELECT s.session_code, s.title, s.created_at, s.updated_at,
+					   s.voting_in_progress, s.votes_revealed, s.vote_average, s.final_estimate,
+					   s.story_point_scale
 				FROM sessions s
-				LEFT JOIN participants p ON s.session_code = p.session_code
-				GROUP BY s.session_code, s.title, s.created_at, s.updated_at
 				ORDER BY s.updated_at DESC
 			`);
 
-			return result.rows.map((row) => ({
-				sessionCode: row.session_code,
-				title: row.title,
-				participants: [], // Not loading full participant data for list view
-				votingState: {
-					votingInProgress: false,
-					votesRevealed: false,
-					voteAverage: '',
-					finalEstimate: ''
-				},
-				storyPointScale: [],
-				createdAt: row.created_at,
-				lastUpdated: row.updated_at
-			}));
+			const sessions: ServerSession[] = [];
+
+			for (const sessionRow of sessionsResult.rows) {
+				// Get participants for each session (including those that might be inactive)
+				const participantsResult = await pool.query(
+					`
+					SELECT name, voted, vote, is_host, is_observer, 
+						   EXTRACT(EPOCH FROM last_seen) * 1000 as last_seen
+					FROM participants 
+					WHERE session_code = $1
+					ORDER BY is_host DESC, name ASC
+				`,
+					[sessionRow.session_code]
+				);
+
+				const session: ServerSession = {
+					sessionCode: sessionRow.session_code,
+					title: sessionRow.title,
+					participants: participantsResult.rows.map((p) => ({
+						name: p.name,
+						voted: p.voted,
+						vote: p.vote,
+						isHost: p.is_host,
+						isObserver: p.is_observer,
+						lastSeen: parseFloat(p.last_seen)
+					})),
+					votingState: {
+						votingInProgress: sessionRow.voting_in_progress,
+						votesRevealed: sessionRow.votes_revealed,
+						voteAverage: sessionRow.vote_average || '',
+						finalEstimate: sessionRow.final_estimate || ''
+					},
+					storyPointScale: sessionRow.story_point_scale || ['0', '1', '2', '3', '5', '8', '?'],
+					createdAt: sessionRow.created_at,
+					lastUpdated: sessionRow.updated_at
+				};
+
+				sessions.push(session);
+			}
+
+			console.log(`[PostgresSessionStore] Retrieved ${sessions.length} sessions for admin`);
+			return sessions;
 		} catch (error) {
 			console.error('[PostgresSessionStore] Error getting all sessions:', error);
 			return [];
+		}
+	}
+
+	static async deleteSession(sessionCode: string): Promise<boolean> {
+		const pool = getPool();
+
+		try {
+			await pool.query('BEGIN');
+
+			// Delete participants first (foreign key constraint)
+			await pool.query('DELETE FROM participants WHERE session_code = $1', [sessionCode]);
+
+			// Delete session
+			const result = await pool.query('DELETE FROM sessions WHERE session_code = $1', [
+				sessionCode
+			]);
+
+			await pool.query('COMMIT');
+
+			const deleted = (result.rowCount ?? 0) > 0;
+			if (deleted) {
+				console.log(`[PostgresSessionStore] Deleted session ${sessionCode}`);
+			} else {
+				console.log(`[PostgresSessionStore] Session ${sessionCode} not found for deletion`);
+			}
+
+			return deleted;
+		} catch (error) {
+			await pool.query('ROLLBACK');
+			console.error(`[PostgresSessionStore] Error deleting session ${sessionCode}:`, error);
+			return false;
 		}
 	}
 }

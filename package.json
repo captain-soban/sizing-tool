@@ -16,7 +16,12 @@
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright test",
 		"db:setup": "createdb planning_poker 2>/dev/null || echo 'Database may already exist'",
-		"db:reset": "dropdb planning_poker 2>/dev/null; createdb planning_poker"
+		"db:reset": "dropdb planning_poker 2>/dev/null; createdb planning_poker",
+		"docker:build": "docker build -t sizing-tool .",
+		"docker:run": "docker run -p 3000:3000 sizing-tool",
+		"docker:up": "docker-compose up -d",
+		"docker:down": "docker-compose down",
+		"docker:logs": "docker-compose logs -f"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",

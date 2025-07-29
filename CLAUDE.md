@@ -17,6 +17,7 @@ This is a **SvelteKit-based Planning Poker/Story Point Sizing Tool** for agile d
 
 ## Development Commands
 
+### Local Development
 ```bash
 npm run dev          # Start development server
 npm run build        # Build for production
@@ -30,6 +31,15 @@ npm run check        # Type check with svelte-check
 npm run check:watch  # Type check in watch mode
 npm run db:setup     # Create PostgreSQL database
 npm run db:reset     # Reset database (removes all data)
+```
+
+### Docker Commands
+```bash
+npm run docker:up    # Start app and PostgreSQL with docker-compose
+npm run docker:down  # Stop and remove containers
+npm run docker:logs  # View container logs
+npm run docker:build # Build Docker image only
+npm run docker:run   # Run app container only (requires external DB)
 ```
 
 ## Code Architecture
@@ -66,20 +76,25 @@ The app follows this user journey:
 
 ### Build & Deployment
 
-- Frontend: SvelteKit with adapter for deployment target
-- Backend: SvelteKit server routes for session management
-- Real-time: Server-Sent Events (SSE) for live updates
-- Database: PostgreSQL for persistent session storage
+- **Frontend**: SvelteKit with adapter for deployment target
+- **Backend**: SvelteKit server routes for session management
+- **Real-time**: Server-Sent Events (SSE) for live updates
+- **Database**: PostgreSQL for persistent session storage
+- **Containerization**: Multi-stage Docker build with Node.js 18 Alpine
+- **Container Orchestration**: Docker Compose with app + PostgreSQL services
+- **Production**: Optimized Docker image with non-root user and health checks
 
 ### Session Management
 
 - **Session Creation**: Generates 8-digit alphanumeric codes (excluding '0' and 'o')
-- **Recent Sessions**: Tracks up to 10 recent sessions with quick-access cards on landing page
-- **Session History**: Displays session title, code, role (host/participant), and last accessed time
-- **Quick Rejoin**: One-click access to recent sessions without re-entering codes or names
+- **Recent Sessions**: Elegant card-based UI tracking up to 10 recent sessions on landing page
+- **Quick Session Access**: One-click rejoin with automatic data pre-population (name, session code)
+- **Session History**: Displays session titles, codes, user roles (host/participant), and timestamps
+- **Smart Session Tracking**: Automatic session title updates and last accessed time tracking
+- **localStorage Migration**: Automatic migration from legacy format to new recent sessions structure
 - **Data Storage**: Server-side session storage with real-time synchronization
 - **User Roles**: Distinguishes between session owner (host) and participants
-- **Session Title**: Each session has a title (sprint cycle, epic, or feature name)
+- **Session Titles**: Each session has a descriptive title (sprint cycle, epic, or feature name)
 - **Multi-user Support**: Real-time participant visibility and voting
 
 ## Key Features & Business Logic
@@ -92,6 +107,15 @@ The app follows this user journey:
 - **Vote Reveal**: Session owner controls simultaneous reveal showing individual votes and average
 - **Result Control**: Owner can accept average or change final estimate
 
+### Admin Dashboard
+
+- **Session Management**: Admin interface at `/admin` for monitoring and managing sessions
+- **Real-time Statistics**: Total sessions, active sessions, and participant counts
+- **Session Operations**: View, terminate, and delete sessions with confirmation dialogs
+- **Participant Tracking**: Detailed participant information with online/offline status
+- **Search and Filter**: Search sessions by code, title, or host name
+- **Session Details Modal**: Comprehensive session information including participant list
+
 ### UI Layout Requirements
 
 - **Poker Table**: Participants displayed around a virtual poker table shape
@@ -102,14 +126,16 @@ The app follows this user journey:
 
 ### Data Persistence Pattern
 
-- PostgreSQL database for persistent session storage
-- Session state includes: codes, participant names, votes, scales, session titles
-- Support for resuming sessions using 8-digit codes
+- **PostgreSQL Database**: Persistent session storage with connection pooling
+- **Session State**: Codes, participant names, votes, scales, session titles, and activity tracking
+- **Session Resumption**: Support for resuming sessions using 8-digit codes
 - **Recent Sessions Storage**: localStorage-based recent sessions with automatic migration from legacy format
 - **Session Preferences**: Per-session user preferences (observer mode, story point scales) stored locally
-- Anonymous mode support (nicknames instead of real names)
-- Real-time updates via Server-Sent Events (SSE)
-- Automatic cleanup of inactive participants and old sessions
+- **Anonymous Mode**: Support for nicknames instead of real names
+- **Real-time Updates**: Server-Sent Events (SSE) for live collaboration
+- **Automatic Cleanup**: Inactive participants and old sessions removed automatically
+- **Admin API**: RESTful endpoints for session management and statistics
+- **Participant Tracking**: Last seen timestamps and online/offline status
 
 ## Development Notes
 

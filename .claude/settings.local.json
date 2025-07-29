@@ -24,7 +24,9 @@
       "Bash(tasklist:*)",
       "Bash(npm run build:*)",
       "Bash(rg:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git merge:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": []
   }
