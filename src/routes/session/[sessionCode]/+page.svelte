@@ -26,12 +26,13 @@
 
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
 
-	onMount(async () => {
+	onMount(() => {
 		const storedPlayerName = localStorage.getItem('playerName');
 		const storedIsHost = localStorage.getItem('isHost') === 'true';
 		const storedSessionCode = localStorage.getItem('sessionCode');
 
 		if (!storedPlayerName || storedSessionCode !== sessionCode) {
+			console.error('[Session] Missing or mismatched session data, redirecting to home');
 			goto('/');
 			return;
 		}
@@ -52,39 +53,90 @@
 			updateFromSessionData(sessionData);
 		});
 
-		try {
-			// Join or rejoin the session
-			const sessionData = await sessionClient.joinSession(sessionCode, playerName, isObserver);
-			updateFromSessionData(sessionData);
+		(async () => {
+			try {
+				// Join or rejoin the session
+				const sessionData = await sessionClient.joinSession(sessionCode, playerName, isObserver);
+				updateFromSessionData(sessionData);
 
-			// Connect to real-time updates
-			sessionClient.connectToRealtime(sessionCode);
+				// Connect to real-time updates
+				sessionClient.connectToRealtime(sessionCode);
 
-			// Load local session settings
-			const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
-			if (storedScale) {
-				if (storedScale === 'custom') {
-					const customScaleData = localStorage.getItem(`session_${sessionCode}_custom_scale`);
-					if (customScaleData) {
-						storyPointOptions = JSON.parse(customScaleData);
+				// Load local session settings
+				const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
+				if (storedScale) {
+					if (storedScale === 'custom') {
+						const customScaleData = localStorage.getItem(`session_${sessionCode}_custom_scale`);
+						if (customScaleData) {
+							storyPointOptions = JSON.parse(customScaleData);
+						}
+					} else {
+						storyPointOptions =
+							defaultStoryPointScales[storedScale as keyof typeof defaultStoryPointScales] ||
+							storyPointOptions;
 					}
-				} else {
-					storyPointOptions =
-						defaultStoryPointScales[storedScale as keyof typeof defaultStoryPointScales] ||
-						storyPointOptions;
 				}
+
+				// Start heartbeat to show this participant is active
+				heartbeatInterval = window.setInterval(() => {
+					if (sessionClient) {
+						sessionClient.sendHeartbeat(sessionCode, playerName);
+					}
+				}, 5000); // Send heartbeat every 5 seconds
+			} catch (error) {
+				console.error('[Session] Error joining session:', error);
+				goto('/');
+			}
+		})();
+
+		// Handle visibility changes to reconnect when user returns to tab
+		const handleVisibilityChange = () => {
+			if (!document.hidden && sessionClient) {
+				// Reconnect to real-time updates if needed
+				sessionClient.connectToRealtime(sessionCode);
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		// Add keyboard shortcuts
+		const handleKeyPress = (e: KeyboardEvent) => {
+			// Don't handle shortcuts if user is typing in an input
+			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+				return;
 			}
 
-			// Start heartbeat to show this participant is active
-			heartbeatInterval = window.setInterval(() => {
-				if (sessionClient) {
-					sessionClient.sendHeartbeat(sessionCode, playerName);
-				}
-			}, 5000); // Send heartbeat every 5 seconds
-		} catch (error) {
-			console.error('[Session] Error joining session:', error);
-			goto('/');
-		}
+			switch (e.key) {
+				case 'Escape':
+					exitSession();
+					break;
+				case 's':
+				case 'S':
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						goToSettings();
+					}
+					break;
+				case '1':
+				case '2':
+				case '3':
+				case '5':
+				case '8':
+				case '0':
+				case '?':
+					if (votingInProgress && !votesRevealed && !isObserver) {
+						selectVote(e.key);
+					}
+					break;
+			}
+		};
+
+		document.addEventListener('keydown', handleKeyPress);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			document.removeEventListener('keydown', handleKeyPress);
+		};
 	});
 
 	onDestroy(() => {
@@ -252,12 +304,86 @@
 	}
 
 	function getParticipantPosition(index: number, total: number) {
-		const angle = (index * 360) / total - 90; // Start from top (12 o'clock position)
-		const radiusX = 47; // Horizontal radius for elliptical positioning
-		const radiusY = 45; // Vertical radius for elliptical positioning
-		const x = 50 + radiusX * Math.cos((angle * Math.PI) / 180);
-		const y = 50 + radiusY * Math.sin((angle * Math.PI) / 180);
-		return { x: `${x}%`, y: `${y}%` };
+		// Start from top (12 o'clock position) and distribute evenly
+		const angle = (index * 360) / total - 90;
+
+		// Define table boundaries and create invisible padding zone
+		// Table occupies: top-[15%] right-[12%] bottom-[15%] left-[12%]
+		const tableEdges = {
+			left: 12, // left-[12%]
+			right: 88, // 100% - right-[12%]
+			top: 15, // top-[15%]
+			bottom: 85 // 100% - bottom-[15%]
+		};
+
+		// Add invisible padding around the table (8% padding on all sides)
+		const padding = 8;
+		const paddedBoundaries = {
+			left: tableEdges.left - padding, // 4%
+			right: tableEdges.right + padding, // 96%
+			top: tableEdges.top - padding, // 7%
+			bottom: tableEdges.bottom + padding // 93%
+		};
+
+		// Calculate radius to place participants outside the padded zone
+		// Use the maximum extent of the padded oval to ensure clearance
+		const paddedRadiusX = Math.max(50 - paddedBoundaries.left, paddedBoundaries.right - 50);
+		const paddedRadiusY = Math.max(50 - paddedBoundaries.top, paddedBoundaries.bottom - 50);
+
+		// Add extra margin based on participant count to prevent crowding
+		const extraMargin = total <= 3 ? 2 : total <= 5 ? 4 : total <= 7 ? 6 : 8;
+		const finalRadiusX = paddedRadiusX + extraMargin;
+		const finalRadiusY = paddedRadiusY + extraMargin;
+
+		const x = 50 + finalRadiusX * Math.cos((angle * Math.PI) / 180);
+		const y = 50 + finalRadiusY * Math.sin((angle * Math.PI) / 180);
+
+		// Ensure participants stay within container bounds
+		const clampedX = Math.max(1, Math.min(99, x));
+		const clampedY = Math.max(1, Math.min(99, y));
+
+		return { x: `${clampedX}%`, y: `${clampedY}%` };
+	}
+
+	// Calculate responsive width based on number of story point options
+	function getEstimationFrameWidth() {
+		const optionCount = storyPointOptions.length;
+		if (optionCount <= 5) return 'max-w-sm';
+		if (optionCount <= 7) return 'max-w-md';
+		if (optionCount <= 9) return 'max-w-lg';
+		if (optionCount <= 12) return 'max-w-xl';
+		return 'max-w-2xl';
+	}
+
+	// Calculate responsive button size and spacing based on number of options
+	function getButtonClasses(isSelected: boolean) {
+		const optionCount = storyPointOptions.length;
+		let baseClasses = '';
+
+		if (optionCount <= 7) {
+			// Larger buttons for fewer options
+			baseClasses = 'min-w-[2.5rem] h-8 text-sm sm:min-w-[3rem] sm:h-9 sm:text-base';
+		} else if (optionCount <= 10) {
+			// Medium buttons for moderate options
+			baseClasses = 'min-w-[2rem] h-7 text-xs sm:min-w-[2.5rem] sm:h-8 sm:text-sm';
+		} else {
+			// Smaller buttons for many options
+			baseClasses = 'min-w-[1.75rem] h-6 text-xs sm:min-w-[2rem] sm:h-7 sm:text-sm';
+		}
+
+		if (isSelected) {
+			return `bg-poker-blue hover:bg-poker-blue/90 slide-up ${baseClasses} font-bold shadow-md`;
+		} else {
+			return `btn-poker-gray poker-card-hover ${baseClasses} font-semibold hover:shadow-sm transition-all duration-200`;
+		}
+	}
+
+	// Calculate gap size based on number of options
+	function getButtonGap() {
+		const optionCount = storyPointOptions.length;
+		if (optionCount <= 7) return 'gap-1.5 sm:gap-2';
+		if (optionCount <= 10) return 'gap-1 sm:gap-1.5';
+		return 'gap-0.5 sm:gap-1';
 	}
 </script>
 
@@ -265,8 +391,69 @@
 	<!-- Session Title - Upper Left -->
 	<div class="fixed top-4 left-4 z-10">
 		<div class="rounded-lg border bg-white/90 px-3 py-2 shadow-lg backdrop-blur-sm">
-			<h1 class="text-poker-blue text-sm font-bold sm:text-base lg:text-lg">{sessionTitle}</h1>
+			{#if editingTitle}
+				<div class="space-y-2">
+					<input
+						type="text"
+						bind:value={tempTitle}
+						class="w-full rounded border p-1 text-sm font-bold text-blue-700 sm:text-base lg:text-lg"
+						placeholder="Enter session title"
+						onkeydown={(e) => {
+							if (e.key === 'Enter') saveTitle();
+							if (e.key === 'Escape') cancelEditTitle();
+						}}
+						autofocus
+					/>
+					<div class="flex gap-1">
+						<Button
+							onclick={saveTitle}
+							size="sm"
+							class="bg-green-500 text-xs text-white hover:bg-green-600"
+						>
+							Save
+						</Button>
+						<Button
+							onclick={cancelEditTitle}
+							variant="outline"
+							size="sm"
+							class="btn-poker-gray text-xs"
+						>
+							Cancel
+						</Button>
+					</div>
+				</div>
+			{:else}
+				<div class="group">
+					{#if isHost}
+						<button
+							type="button"
+							class="m-0 cursor-pointer rounded border-none bg-transparent p-0 text-left text-sm font-bold text-blue-700 transition-colors hover:text-blue-700/80 focus:text-blue-700/80 focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:outline-none sm:text-base lg:text-lg"
+							onclick={startEditingTitle}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									startEditingTitle();
+								}
+							}}
+							title="Click to edit title"
+						>
+							{sessionTitle}
+							<span class="ml-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+								>✏️</span
+							>
+						</button>
+					{:else}
+						<h1 class="text-sm font-bold text-blue-700 sm:text-base lg:text-lg">{sessionTitle}</h1>
+					{/if}
+				</div>
+			{/if}
 			<p class="text-xs text-gray-600">Session: {sessionCode}</p>
+			<p class="text-xs text-gray-500">
+				👥 {participants.length} participant{participants.length !== 1 ? 's' : ''}
+				{#if participants.filter((p) => !p.isObserver).length !== participants.length}
+					({participants.filter((p) => !p.isObserver).length} voting)
+				{/if}
+			</p>
 		</div>
 	</div>
 
@@ -287,66 +474,27 @@
 
 	<!-- Main Poker Table -->
 	<div class="flex min-h-screen items-center justify-center p-2">
-		<div class="relative w-full max-w-5xl">
+		<div class="relative w-full max-w-4xl">
 			<!-- Poker Table Container with participants positioned around it -->
-			<div class="relative aspect-[4/3] max-h-[700px] min-h-[500px] w-full">
+			<div class="relative aspect-[5/3] max-h-[450px] min-h-[350px] w-full">
 				<!-- Poker Table (Oval) -->
 				<div
-					class="absolute top-[12%] right-[12%] bottom-[12%] left-[12%] rounded-full border-4 border-amber-900 bg-green-800 shadow-2xl sm:border-6 lg:border-8"
+					class="absolute top-[15%] right-[12%] bottom-[15%] left-[12%] border-3 border-amber-900 bg-green-800 shadow-xl sm:border-4"
+					style="border-radius: 50% / 40%;"
 				>
 					<!-- Table Center Area -->
-					<div class="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-4">
-						<Card class="work-area w-full max-w-xs text-center sm:max-w-sm">
-							<CardContent class="p-3 sm:p-4 lg:p-6">
+					<div class="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-3">
+						<Card class="work-area w-full max-w-[240px] text-center sm:max-w-[280px]">
+							<CardContent class="p-2.5 sm:p-3 lg:p-4">
 								<!-- Session Title -->
-								{#if editingTitle}
-									<div class="mb-3 space-y-2 sm:mb-4">
-										<input
-											type="text"
-											bind:value={tempTitle}
-											class="w-full rounded border p-2 text-center text-sm font-bold sm:text-lg"
-											placeholder="Enter session title"
-											autofocus
-											onkeydown={(e) => {
-												if (e.key === 'Enter') saveTitle();
-												if (e.key === 'Escape') cancelEditTitle();
-											}}
-										/>
-										<div class="flex justify-center gap-2">
-											<Button
-												onclick={saveTitle}
-												size="sm"
-												class="bg-green-500 text-xs text-white hover:bg-green-600 sm:text-sm"
-											>
-												Save
-											</Button>
-											<Button
-												onclick={cancelEditTitle}
-												variant="outline"
-												size="sm"
-												class="btn-poker-gray text-xs sm:text-sm"
-											>
-												Cancel
-											</Button>
-										</div>
-									</div>
-								{:else}
-									<div class="group mb-3 sm:mb-4">
-										<h2
-											class="text-poker-blue hover:text-poker-blue/80 cursor-pointer text-lg leading-tight font-bold transition-colors sm:text-xl lg:text-2xl"
-											onclick={startEditingTitle}
-											title={isHost ? 'Click to edit title' : 'Session title'}
-										>
-											{sessionTitle}
-											{#if isHost}
-												<span
-													class="ml-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 sm:ml-2 sm:text-sm"
-													>✏️</span
-												>
-											{/if}
-										</h2>
-									</div>
-								{/if}
+								<div class="mb-3 sm:mb-4">
+									<h2
+										class="text-lg leading-tight font-bold text-blue-700 sm:text-xl lg:text-2xl"
+										title="Session title"
+									>
+										{sessionTitle}
+									</h2>
+								</div>
 
 								<!-- Voting Status and Results -->
 								{#if votesRevealed && voteAverage}
@@ -377,12 +525,17 @@
 														🔄 Re-vote
 													</Button>
 													<Button
-														onclick={() => {
+														onclick={async () => {
 															const customValue = prompt('Enter custom estimate:', voteAverage);
-															if (customValue && customValue.trim()) {
-																finalEstimate = customValue.trim();
-																votingInProgress = false;
-																saveSessionState();
+															if (customValue && customValue.trim() && sessionClient) {
+																try {
+																	await sessionClient.updateVotingState(sessionCode, {
+																		finalEstimate: customValue.trim(),
+																		votingInProgress: false
+																	});
+																} catch (error) {
+																	console.error('[Session] Error saving custom estimate:', error);
+																}
 															}
 														}}
 														variant="outline"
@@ -402,9 +555,17 @@
 												</p>
 												{#if isHost}
 													<Button
-														onclick={() => {
-															finalEstimate = '';
-															saveSessionState();
+														onclick={async () => {
+															if (sessionClient) {
+																try {
+																	await sessionClient.updateVotingState(sessionCode, {
+																		finalEstimate: '',
+																		votingInProgress: false
+																	});
+																} catch (error) {
+																	console.error('[Session] Error resetting final estimate:', error);
+																}
+															}
 														}}
 														variant="outline"
 														size="sm"
@@ -454,56 +615,61 @@
 						class="absolute -translate-x-1/2 -translate-y-1/2 transform"
 						style="left: {position.x}; top: {position.y};"
 					>
-						<div class="flex flex-col items-center space-y-1 sm:space-y-2">
+						<div class="flex flex-col items-center">
 							<!-- Participant Card -->
-							<Card class="work-area max-w-[140px] min-w-[100px] sm:min-w-[120px]">
-								<CardContent class="p-2 text-center sm:p-3">
-									<div class="mb-1 flex flex-wrap items-center justify-center space-x-1">
-										<span class="text-xs font-medium break-words sm:text-sm"
+							<Card class="work-area w-24 sm:w-28">
+								<CardContent class="p-1.5 text-center sm:p-2">
+									<!-- Participant Name and Badges -->
+									<div class="mb-1 flex flex-col items-center space-y-0.5">
+										<span
+											class="max-w-full text-center text-[11px] leading-tight font-medium break-words sm:text-xs"
 											>{participant.name}</span
 										>
-										{#if participant.isHost}
-											<span class="bg-poker-blue rounded px-1 text-[10px] text-white sm:text-xs"
-												>HOST</span
-											>
-										{/if}
-										{#if participant.isObserver}
-											<span
-												class="rounded bg-orange-200 px-1 text-[10px] text-orange-800 sm:text-xs"
-												>👁️</span
-											>
-										{/if}
+										<div class="flex flex-wrap items-center justify-center gap-0.5">
+											{#if participant.isHost}
+												<span
+													class="bg-poker-blue rounded px-1 py-0.5 text-[8px] font-medium text-white sm:text-[9px]"
+													>HOST</span
+												>
+											{/if}
+											{#if participant.isObserver}
+												<span
+													class="rounded bg-orange-200 px-1 py-0.5 text-[8px] font-medium text-orange-800 sm:text-[9px]"
+													>👁️</span
+												>
+											{/if}
+										</div>
 									</div>
 
 									<!-- Vote Status Indicator -->
 									<div class="flex justify-center">
 										{#if participant.isObserver}
 											<div
-												class="rounded-md bg-orange-100 px-2 py-1 text-[10px] text-orange-600 sm:px-3 sm:text-xs"
+												class="rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-medium text-orange-600 sm:px-2 sm:py-1 sm:text-[10px]"
 											>
 												👁️ Observer
 											</div>
 										{:else if votesRevealed && participant.vote}
 											<div
-												class="bounce-in bg-poker-blue rounded-md px-2 py-1 text-xs font-bold text-white sm:px-3 sm:text-sm"
+												class="bounce-in bg-poker-blue rounded px-2 py-0.5 text-xs font-bold text-white sm:px-2.5 sm:py-1 sm:text-sm"
 											>
 												{participant.vote}
 											</div>
 										{:else if participant.voted}
 											<div
-												class="bounce-in rounded-md bg-green-500 px-2 py-1 text-[10px] font-medium text-white sm:px-3 sm:text-xs"
+												class="bounce-in rounded bg-green-500 px-1.5 py-0.5 text-[9px] font-medium text-white sm:px-2 sm:py-1 sm:text-[10px]"
 											>
 												✓ Voted
 											</div>
 										{:else if votingInProgress}
 											<div
-												class="thinking rounded-md bg-yellow-100 px-2 py-1 text-[10px] text-yellow-700 sm:px-3 sm:text-xs"
+												class="thinking rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 sm:px-2 sm:py-1 sm:text-[10px]"
 											>
-												🤔 Thinking...
+												🤔 Thinking
 											</div>
 										{:else}
 											<div
-												class="rounded-md bg-gray-100 px-2 py-1 text-[10px] text-gray-500 sm:px-3 sm:text-xs"
+												class="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-500 sm:px-2 sm:py-1 sm:text-[10px]"
 											>
 												Ready
 											</div>
@@ -520,19 +686,21 @@
 
 	<!-- Voting Cards (Bottom) -->
 	{#if votingInProgress && !votesRevealed && !isObserver}
-		<div class="fixed bottom-8 left-1/2 -translate-x-1/2 transform">
+		<div
+			class="fixed bottom-4 left-1/2 w-full -translate-x-1/2 transform {getEstimationFrameWidth()} px-4 sm:bottom-6"
+		>
 			<Card class="work-area">
-				<CardContent class="p-4">
-					<p class="mb-4 text-center text-sm font-medium">Choose your estimate:</p>
-					<div class="flex justify-center gap-2">
+				<CardContent class="p-2 sm:p-3">
+					<p class="mb-1 text-center text-xs font-medium sm:text-sm">Choose your estimate:</p>
+					<p class="mb-2 text-center text-[10px] text-gray-500 sm:text-xs">
+						💡 Press 0-8 or ? to vote quickly
+					</p>
+					<div class="flex flex-wrap justify-center {getButtonGap()}">
 						{#each storyPointOptions as option (option)}
 							<Button
 								onclick={() => selectVote(option)}
 								variant={selectedVote === option ? 'default' : 'outline'}
-								class={selectedVote === option
-									? 'bg-poker-blue hover:bg-poker-blue/90'
-									: 'btn-poker-gray'}
-								size="lg"
+								class={getButtonClasses(selectedVote === option)}
 							>
 								{option}
 							</Button>
@@ -545,10 +713,12 @@
 
 	<!-- Observer Message (Bottom) -->
 	{#if votingInProgress && !votesRevealed && isObserver}
-		<div class="fixed bottom-8 left-1/2 -translate-x-1/2 transform">
+		<div
+			class="fixed bottom-4 left-1/2 w-full max-w-2xl -translate-x-1/2 transform px-4 sm:bottom-8"
+		>
 			<Card class="work-area">
-				<CardContent class="p-4">
-					<p class="text-center text-sm text-orange-600">
+				<CardContent class="p-4 sm:p-6">
+					<p class="text-center text-sm text-orange-600 sm:text-base">
 						👁️ You are observing this session. Toggle to participant mode to vote.
 					</p>
 				</CardContent>
@@ -556,3 +726,45 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	@keyframes pulse {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.7;
+		}
+	}
+
+	@keyframes slideInUp {
+		from {
+			transform: translateY(20px);
+			opacity: 0;
+		}
+		to {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
+
+	@keyframes scaleIn {
+		from {
+			transform: scale(0.8);
+			opacity: 0;
+		}
+		to {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+
+	.thinking {
+		animation: pulse 2s infinite;
+	}
+
+	.bounce-in {
+		animation: scaleIn 0.3s ease-out;
+	}
+</style>

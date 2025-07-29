@@ -6,15 +6,18 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
 	import { defaultStoryPointScales } from '$lib/stores/session';
+	import { SessionClient } from '$lib/api/sessionClient';
 
-	const sessionCode = $page.params.sessionCode;
+	const sessionCode = $page.params.sessionCode!;
 
 	let sessionTitle = $state('Sprint Planning Session');
 	let selectedScale = $state('fibonacci_0_8');
 	let customScale = $state('');
 	let isHost = $state(false);
+	let sessionClient: SessionClient;
+	let originalTitle = $state('');
 
-	onMount(() => {
+	onMount(async () => {
 		const storedIsHost = localStorage.getItem('isHost') === 'true';
 		const storedSessionCode = localStorage.getItem('sessionCode');
 
@@ -24,28 +27,55 @@
 		}
 
 		isHost = storedIsHost;
+		sessionClient = new SessionClient();
 
-		// Load settings from localStorage
-		const storedTitle = localStorage.getItem(`session_${sessionCode}_title`);
+		try {
+			// Load current session data from server
+			const sessionData = await sessionClient.getSession(sessionCode);
+			sessionTitle = sessionData.title;
+			originalTitle = sessionData.title;
+		} catch (error) {
+			console.error('[Settings] Error loading session:', error);
+			// Fallback to localStorage
+			const storedTitle = localStorage.getItem(`session_${sessionCode}_title`);
+			if (storedTitle) {
+				sessionTitle = storedTitle;
+				originalTitle = storedTitle;
+			}
+		}
+
+		// Load scale settings from localStorage (these are still local preferences)
 		const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
-
-		if (storedTitle) sessionTitle = storedTitle;
 		if (storedScale) selectedScale = storedScale;
 	});
 
-	function saveSettings() {
-		localStorage.setItem(`session_${sessionCode}_title`, sessionTitle);
-		localStorage.setItem(`session_${sessionCode}_scale`, selectedScale);
+	async function saveSettings() {
+		try {
+			// Update session title on server if it changed
+			if (isHost && sessionTitle !== originalTitle && sessionClient) {
+				await sessionClient.updateSessionTitle(sessionCode, sessionTitle);
+			}
 
-		if (selectedScale === 'custom' && customScale) {
-			const customScaleArray = customScale
-				.split(',')
-				.map((s) => s.trim())
-				.filter((s) => s);
-			localStorage.setItem(`session_${sessionCode}_custom_scale`, JSON.stringify(customScaleArray));
+			// Save local preferences to localStorage
+			localStorage.setItem(`session_${sessionCode}_scale`, selectedScale);
+
+			if (selectedScale === 'custom' && customScale) {
+				const customScaleArray = customScale
+					.split(',')
+					.map((s) => s.trim())
+					.filter((s) => s);
+				localStorage.setItem(
+					`session_${sessionCode}_custom_scale`,
+					JSON.stringify(customScaleArray)
+				);
+			}
+
+			goto(`/session/${sessionCode}`);
+		} catch (error) {
+			console.error('[Settings] Error saving settings:', error);
+			// Still navigate back even if there's an error
+			goto(`/session/${sessionCode}`);
 		}
-
-		goto(`/session/${sessionCode}`);
 	}
 
 	function goBack() {
