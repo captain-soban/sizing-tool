@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
-import { broadcastSessionUpdate } from '../../events/+server';
+import { broadcastSessionUpdate } from '$lib/server/sseUtils';
 import type { RequestHandler } from './$types';
 
 // PATCH /api/sessions/[sessionCode]/participants/[playerName] - Update participant

@@ -7,13 +7,14 @@ let pool: Pool;
 export function getPool(): Pool {
 	if (!pool) {
 		pool = new Pool({
-			connectionString: process.env.DATABASE_URL,
+			connectionString:
+				process.env.DATABASE_URL || 'postgresql://sizingtool:sizing@localhost:5432/planning_poker',
 			// Development defaults for local PostgreSQL
 			host: process.env.DB_HOST || 'localhost',
 			port: parseInt(process.env.DB_PORT || '5432'),
 			database: process.env.DB_NAME || 'planning_poker',
-			user: process.env.DB_USER || 'postgres',
-			password: process.env.DB_PASSWORD || 'postgres',
+			user: process.env.DB_USER || 'sizingtool',
+			password: process.env.DB_PASSWORD || 'sizing',
 			// Production optimizations
 			max: parseInt(process.env.DB_POOL_MAX || '10'),
 			idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000'),
@@ -156,6 +157,10 @@ if (typeof window === 'undefined') {
 	// Only run on server side
 	initDatabase().catch((error) => {
 		console.error('[Database] Failed to initialize:', error);
+		console.error(
+			'[Database] Please ensure PostgreSQL is running and the connection settings are correct'
+		);
+		console.error('[Database] Check your .env file or create one based on .env.example');
 	});
 
 	// Run cleanup every 5 minutes

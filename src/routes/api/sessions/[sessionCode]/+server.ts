@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
+import { broadcastSessionUpdate } from '$lib/server/sseUtils';
 import type { RequestHandler } from './$types';
 
 // GET /api/sessions/[sessionCode] - Get session details
@@ -37,6 +38,9 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 			if (!session) {
 				return json({ error: 'Session not found' }, { status: 404 });
 			}
+
+			// Broadcast update to all connected clients
+			await broadcastSessionUpdate(sessionCode);
 
 			return json({
 				sessionCode: session.sessionCode,

@@ -212,27 +212,214 @@ Built-in scales include:
 
 ## Deployment
 
+This application can be deployed to various platforms with automatic database setup. The database schema is created automatically on first startup.
+
+### Platform-Specific Deployment
+
+#### 🚀 Vercel (Recommended)
+
+1. **Push to GitHub**
+   ```bash
+   git add . && git commit -m "Ready for deployment"
+   git push origin main
+   ```
+
+2. **Deploy to Vercel**
+   - Connect your GitHub repository to [Vercel](https://vercel.com)
+   - Add PostgreSQL database:
+     - Go to Storage tab → Browse → Postgres → Create
+     - Copy the connection string
+
+3. **Set Environment Variables**
+   ```bash
+   DATABASE_URL=postgresql://user:password@host:port/database
+   NODE_ENV=production
+   ```
+
+4. **Deploy** - Vercel automatically builds and deploys your app
+
+#### 🚂 Railway
+
+1. **Connect Repository**
+   - Go to [Railway](https://railway.app) → New Project → Deploy from GitHub
+
+2. **Add PostgreSQL**
+   - Add Service → Database → PostgreSQL
+   - Railway automatically provides `DATABASE_URL`
+
+3. **Set Environment Variables**
+   ```bash
+   NODE_ENV=production
+   ```
+
+4. **Deploy** - Railway handles the rest automatically
+
+#### ☁️ Other Cloud Platforms
+
+**Render, Fly.io, DigitalOcean App Platform:**
+1. Connect your repository
+2. Add managed PostgreSQL service  
+3. Set `DATABASE_URL` and `NODE_ENV=production`
+4. Deploy
+
+#### 🐳 Docker Deployment
+
+1. **Create production environment file:**
+   ```bash
+   # .env.production
+   DATABASE_URL=postgresql://user:password@postgres:5432/planning_poker
+   NODE_ENV=production
+   ```
+
+2. **Use Docker Compose:**
+   ```yaml
+   # docker-compose.yml
+   version: '3.8'
+   services:
+     app:
+       build: .
+       ports:
+         - "3000:3000"
+       environment:
+         - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/planning_poker
+         - NODE_ENV=production
+       depends_on:
+         - postgres
+     
+     postgres:
+       image: postgres:15
+       environment:
+         POSTGRES_DB: planning_poker
+         POSTGRES_USER: postgres
+         POSTGRES_PASSWORD: postgres
+       volumes:
+         - postgres_data:/var/lib/postgresql/data
+   
+   volumes:
+     postgres_data:
+   ```
+
+3. **Deploy:**
+   ```bash
+   docker-compose up -d
+   ```
+
+#### 🖥️ VPS/Traditional Server
+
+1. **Prepare server with Node.js 18+ and PostgreSQL**
+
+2. **Clone and build:**
+   ```bash
+   git clone <your-repo-url>
+   cd sizing-tool
+   npm ci --production
+   npm run build
+   ```
+
+3. **Set up database:**
+   ```bash
+   # Create database and user
+   sudo -u postgres createdb planning_poker
+   sudo -u postgres createuser planningpoker
+   ```
+
+4. **Configure environment:**
+   ```bash
+   export DATABASE_URL=postgresql://planningpoker:password@localhost:5432/planning_poker
+   export NODE_ENV=production
+   ```
+
+5. **Start with PM2:**
+   ```bash
+   npm install -g pm2
+   pm2 start build/index.js --name planning-poker
+   pm2 startup
+   pm2 save
+   ```
+
+### Database Setup in Production
+
+**🔄 Automatic Schema Creation**
+- Tables and indexes are created automatically on first startup
+- No manual SQL scripts needed
+- Database migrations run seamlessly
+
+**🔧 Manual Database Setup (if needed)**
+```bash
+# Connect to your production database
+psql $DATABASE_URL
+
+# Tables will be created automatically, but you can verify:
+\dt  # List tables
+\d sessions  # Describe sessions table
+```
+
+### Environment Variables
+
+**Required for all deployments:**
+```bash
+DATABASE_URL=postgresql://user:password@host:port/database_name
+NODE_ENV=production
+```
+
+**Optional configuration:**
+```bash
+# Database connection pooling
+DB_POOL_MAX=10
+DB_IDLE_TIMEOUT=30000
+DB_CONNECTION_TIMEOUT=2000
+
+# For custom database parameters (if not using DATABASE_URL)
+DB_HOST=your-db-host
+DB_PORT=5432
+DB_NAME=planning_poker
+DB_USER=your-username
+DB_PASSWORD=your-password
+```
+
+### SSL Connections
+
+**Production SSL is automatic:**
+- Development: `ssl: false`
+- Production: `ssl: { rejectUnauthorized: false }` (enabled when `NODE_ENV=production`)
+
 ### Building for Production
 
 ```bash
+# Build the application
 npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-### Deployment Options
+### Health Checks
 
-- **Vercel**: Zero-config deployment with PostgreSQL add-on
-- **Railway**: Built-in PostgreSQL with automatic deployments
-- **Docker**: Containerized deployment with docker-compose
-- **Traditional VPS**: Node.js server with PostgreSQL instance
-
-### Environment Setup
-
-Ensure these environment variables are set in production:
-
+Test your deployment:
 ```bash
-DATABASE_URL=postgresql://...
-NODE_ENV=production
+# Check if app is running
+curl https://your-app-url.com
+
+# Test API endpoints
+curl https://your-app-url.com/api/sessions
+
+# Create a test session
+curl -X POST https://your-app-url.com/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"hostName":"Test User"}'
 ```
+
+### Production Monitoring
+
+**Database Cleanup:**
+- Inactive sessions removed after 24 hours
+- Inactive participants removed after 30 seconds  
+- Automatic cleanup runs every 5 minutes
+
+**Performance:**
+- Connection pooling (max 10 connections)
+- Server-Sent Events for real-time updates
+- Optimized database indexes
 
 ## Contributing
 
