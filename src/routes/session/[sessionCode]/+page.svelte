@@ -4,7 +4,13 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
-	import { defaultStoryPointScales, type Participant } from '$lib/stores/session';
+	import {
+		defaultStoryPointScales,
+		type Participant,
+		getRecentSessions,
+		addRecentSession,
+		updateRecentSessionTitle
+	} from '$lib/stores/session';
 	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
 
 	const sessionCode = $page.params.sessionCode!;
@@ -27,18 +33,26 @@
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
 
 	onMount(() => {
-		const storedPlayerName = localStorage.getItem('playerName');
-		const storedIsHost = localStorage.getItem('isHost') === 'true';
-		const storedSessionCode = localStorage.getItem('sessionCode');
+		// Try to find the session in recent sessions
+		const recentSessions = getRecentSessions();
+		const currentSession = recentSessions.find((s) => s.sessionCode === sessionCode);
 
-		if (!storedPlayerName || storedSessionCode !== sessionCode) {
-			console.error('[Session] Missing or mismatched session data, redirecting to home');
+		if (!currentSession) {
+			console.error('[Session] Session not found in recent data, redirecting to home');
 			goto('/');
 			return;
 		}
 
-		playerName = storedPlayerName;
-		isHost = storedIsHost;
+		playerName = currentSession.playerName;
+		isHost = currentSession.isHost;
+
+		// Update the session's last accessed time
+		addRecentSession({
+			sessionCode: currentSession.sessionCode,
+			playerName: currentSession.playerName,
+			isHost: currentSession.isHost,
+			sessionTitle: currentSession.sessionTitle
+		});
 
 		// Load observer status from localStorage (user preference)
 		const storedIsObserver =
@@ -160,6 +174,9 @@
 		if (JSON.stringify(sessionData.storyPointScale) !== JSON.stringify(storyPointOptions)) {
 			storyPointOptions = sessionData.storyPointScale;
 		}
+
+		// Update recent session title if it changed
+		updateRecentSessionTitle(sessionCode, playerName, sessionData.title);
 	}
 
 	function saveSessionState() {
@@ -192,9 +209,7 @@
 	}
 
 	function exitSession() {
-		localStorage.removeItem('sessionCode');
-		localStorage.removeItem('playerName');
-		localStorage.removeItem('isHost');
+		// The recent sessions data will remain for quick access later
 		goto('/');
 	}
 

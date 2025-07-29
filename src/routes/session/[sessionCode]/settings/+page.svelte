@@ -5,7 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
-	import { defaultStoryPointScales } from '$lib/stores/session';
+	import { defaultStoryPointScales, getRecentSessions } from '$lib/stores/session';
 	import { SessionClient } from '$lib/api/sessionClient';
 
 	const sessionCode = $page.params.sessionCode!;
@@ -18,15 +18,16 @@
 	let originalTitle = $state('');
 
 	onMount(async () => {
-		const storedIsHost = localStorage.getItem('isHost') === 'true';
-		const storedSessionCode = localStorage.getItem('sessionCode');
+		// Try to find the session in recent sessions
+		const recentSessions = getRecentSessions();
+		const currentSession = recentSessions.find((s) => s.sessionCode === sessionCode);
 
-		if (storedSessionCode !== sessionCode) {
+		if (!currentSession) {
 			goto('/');
 			return;
 		}
 
-		isHost = storedIsHost;
+		isHost = currentSession.isHost;
 		sessionClient = new SessionClient();
 
 		try {

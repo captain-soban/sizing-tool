@@ -10,8 +10,10 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 
 - **Session Creation**: Landing page provides option to start new sizing session or join existing session
 - **Session Codes**: Generate 8-digit alphanumeric codes (excluding '0' and 'o' for clarity)
+- **Recent Sessions**: Quick-access cards showing up to 10 recent sessions with one-click rejoin
+- **Session History**: Display session titles, codes, user roles (host/participant), and last accessed timestamps
 - **Session Owner**: User who creates session becomes the owner with configuration privileges
-- **localStorage Persistence**: All session data persists client-side using localStore utility
+- **localStorage Persistence**: Recent sessions and preferences persist client-side with automatic migration
 
 ### User Management
 
@@ -64,6 +66,8 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 
 ### User Experience
 
+- **Recent Sessions UI**: Elegant card-based interface for quick session access
+- **Smart Session Tracking**: Automatic session title updates and timestamp tracking
 - **Theme Support**: Red, white, blue color scheme with customization
 - **Accessibility**: ARIA labels and keyboard navigation
 - **Mobile Optimization**: Touch-friendly interface for mobile devices
@@ -77,7 +81,8 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 ## Technical Implementation Notes
 
 - **Framework**: SvelteKit with Svelte 5 runes (`$state`, `$effect`)
-- **State Management**: Custom localStore utility for reactive localStorage
-- **No Backend**: Pure client-side application with no external dependencies
+- **State Management**: Custom localStore utility for reactive localStorage + recent sessions storage
+- **Data Migration**: Automatic migration from legacy localStorage format to new recent sessions
+- **PostgreSQL Backend**: Server-side session storage with real-time synchronization
 - **Testing**: Vitest unit tests and Playwright E2E tests
-- **Build**: Static site generation with @sveltejs/adapter-static
+- **Build**: SvelteKit with adapter for deployment target
