@@ -5,6 +5,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
 	import { SessionClient } from '$lib/api/sessionClient';
+	import SessionSetupModal from '$lib/components/SessionSetupModal.svelte';
 	import {
 		addRecentSession,
 		getRecentSessions,
@@ -18,6 +19,7 @@
 	let isJoining = $state(false);
 	let error = $state('');
 	let recentSessions = $state<RecentSession[]>([]);
+	let showSetupModal = $state(false);
 
 	const sessionClient = new SessionClient();
 
@@ -28,21 +30,30 @@
 		recentSessions = getRecentSessions();
 	});
 
-	async function createSession() {
+	function handleCreateSessionClick() {
 		if (!playerName.trim()) return;
+		showSetupModal = true;
+	}
+
+	async function handleSessionSetup(title: string, scale: string[]) {
+		if (!playerName.trim() || !title.trim()) return;
 
 		isCreating = true;
 		error = '';
 
 		try {
-			const session = await sessionClient.createSession(playerName.trim());
+			const session = await sessionClient.createSession(
+				playerName.trim(), 
+				title, 
+				scale
+			);
 
 			// Add to recent sessions
 			addRecentSession({
 				sessionCode: session.sessionCode,
 				playerName: playerName.trim(),
 				isHost: true,
-				sessionTitle: undefined
+				sessionTitle: title
 			});
 
 			goto(`/session/${session.sessionCode}`);
@@ -52,6 +63,10 @@
 		} finally {
 			isCreating = false;
 		}
+	}
+
+	function handleModalCancel() {
+		showSetupModal = false;
 	}
 
 	async function joinSession() {
@@ -143,7 +158,9 @@
 
 	<Card class="work-area w-full max-w-md">
 		<CardHeader>
-			<CardTitle class="text-poker-blue text-center text-3xl font-bold">Planning Poker</CardTitle>
+			<div class="flex justify-center">
+				<img src="/logo.svg" alt="Planning Poker Logo" class="h-16 w-auto" />
+			</div>
 		</CardHeader>
 		<CardContent class="space-y-6">
 			<!-- Error Message -->
@@ -220,13 +237,13 @@
 			{/if}
 
 			<div class="space-y-2">
-				<label for="playerName" class="text-sm font-medium"> Your Name </label>
+				<label for="playerName" class="text-sm font-medium">Your Name</label>
 				<Input id="playerName" type="text" bind:value={playerName} placeholder="Enter your name" />
 			</div>
 
 			<div class="space-y-4">
 				<Button
-					onclick={createSession}
+					onclick={handleCreateSessionClick}
 					disabled={!playerName.trim() || isCreating || isJoining}
 					class="bg-poker-blue hover:bg-poker-blue/90 w-full"
 				>
@@ -274,3 +291,11 @@
 		</CardContent>
 	</Card>
 </div>
+
+<!-- Session Setup Modal -->
+<SessionSetupModal 
+	bind:show={showSetupModal}
+	playerName={playerName}
+	onCancel={handleModalCancel}
+	onConfirm={handleSessionSetup}
+/>

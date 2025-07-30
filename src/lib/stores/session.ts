@@ -91,7 +91,7 @@ export function generateUserId(): string {
 
 export function getUserId(): string {
 	if (typeof localStorage === 'undefined') return generateUserId();
-
+	
 	let userId = localStorage.getItem(USER_ID_KEY);
 	if (!userId) {
 		userId = generateUserId();
@@ -125,9 +125,7 @@ export function getRecentSessions(): RecentSession[] {
 	}
 }
 
-export function addRecentSession(
-	sessionData: Omit<RecentSession, 'lastAccessed' | 'userId'>
-): void {
+export function addRecentSession(sessionData: Omit<RecentSession, 'lastAccessed' | 'userId'>): void {
 	if (typeof localStorage === 'undefined') return;
 
 	const userId = getUserId();
@@ -226,11 +224,11 @@ export function migrateOldSessionData(): void {
 	const stored = localStorage.getItem(RECENT_SESSIONS_KEY);
 	if (stored) {
 		try {
-			const sessions: RecentSession[] = JSON.parse(stored);
+			const sessions: any[] = JSON.parse(stored);
 			let needsUpdate = false;
 			const currentUserId = getUserId();
 
-			const updatedSessions = sessions.map((session) => {
+			const updatedSessions = sessions.map(session => {
 				if (!session.userId) {
 					needsUpdate = true;
 					return { ...session, userId: currentUserId };

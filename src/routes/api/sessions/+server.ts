@@ -6,7 +6,7 @@ import type { RequestHandler } from './$types';
 // POST /api/sessions - Create new session
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const { hostName, userId } = await request.json();
+		const { hostName, userId, title, storyPointScale } = await request.json();
 
 		if (!hostName || typeof hostName !== 'string') {
 			return json({ error: 'Host name is required' }, { status: 400 });
@@ -27,7 +27,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		} while (await PostgresSessionStore.getSession(sessionCode));
 
-		const session = await PostgresSessionStore.createSession(sessionCode, hostName, userId);
+		const session = await PostgresSessionStore.createSession(sessionCode, hostName, userId, title, storyPointScale);
 
 		return json({
 			sessionCode: session.sessionCode,
