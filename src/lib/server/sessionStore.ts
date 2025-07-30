@@ -157,6 +157,16 @@ export class ServerSessionStore {
 		return session;
 	}
 
+	static updateStoryPointScale(sessionCode: string, scale: string[]): ServerSession | null {
+		const session = this.getSession(sessionCode);
+		if (!session) return null;
+
+		session.storyPointScale = scale;
+		session.lastUpdated = new Date();
+		console.log(`[ServerSessionStore] Updated story point scale in ${sessionCode}:`, scale);
+		return session;
+	}
+
 	static resetVotes(sessionCode: string): ServerSession | null {
 		const session = this.getSession(sessionCode);
 		if (!session) return null;

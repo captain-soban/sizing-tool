@@ -140,6 +140,25 @@ export class SessionClient {
 		return response.json();
 	}
 
+	// Update story point scale
+	async updateStoryPointScale(
+		sessionCode: string,
+		storyPointScale: string[]
+	): Promise<SessionData> {
+		const response = await fetch(`/api/sessions/${sessionCode}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ storyPointScale })
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to update story point scale');
+		}
+
+		return response.json();
+	}
+
 	// Connect to Server-Sent Events for real-time updates
 	connectToRealtime(sessionCode: string): void {
 		this.disconnect(); // Clean up any existing connection

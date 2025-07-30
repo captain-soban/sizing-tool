@@ -135,22 +135,34 @@ export class PostgresSessionStore {
 			}
 
 			// Check if this user is already the host of this session
+			// First check by userId, then by name as fallback (for compatibility)
 			const existingHost = await pool.query(
 				`SELECT is_host FROM participants 
-				 WHERE session_code = $1 AND user_id = $2 AND is_host = true`,
-				[sessionCode, userId]
+				 WHERE session_code = $1 AND (user_id = $2 OR name = $3) AND is_host = true`,
+				[sessionCode, userId, playerName]
 			);
 
 			const shouldBeHost = existingHost.rows.length > 0;
 
 			// Insert or update participant
-			await pool.query(
-				`INSERT INTO participants (session_code, name, user_id, is_host, is_observer, last_seen)
-				 VALUES ($1, $2, $3, $4, $5, NOW())
-				 ON CONFLICT (session_code, name)
-				 DO UPDATE SET user_id = $3, is_host = $4, is_observer = $5, last_seen = NOW()`,
+			// First try to update existing participant by userId, then by name, then insert
+			const updateByUserId = await pool.query(
+				`UPDATE participants 
+				 SET name = $2, is_host = $4, is_observer = $5, last_seen = NOW()
+				 WHERE session_code = $1 AND user_id = $3`,
 				[sessionCode, playerName, userId, shouldBeHost, isObserver]
 			);
+
+			if (updateByUserId.rowCount === 0) {
+				// No existing participant found by userId, try insert with conflict resolution by name
+				await pool.query(
+					`INSERT INTO participants (session_code, name, user_id, is_host, is_observer, last_seen)
+					 VALUES ($1, $2, $3, $4, $5, NOW())
+					 ON CONFLICT (session_code, name)
+					 DO UPDATE SET user_id = $3, is_host = $4, is_observer = $5, last_seen = NOW()`,
+					[sessionCode, playerName, userId, shouldBeHost, isObserver]
+				);
+			}
 
 			console.log(
 				`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode} (userId: ${userId}, host: ${shouldBeHost})`
@@ -296,6 +308,30 @@ export class PostgresSessionStore {
 			return await this.getSession(sessionCode);
 		} catch (error) {
 			console.error(`[PostgresSessionStore] Error updating session title:`, error);
+			return null;
+		}
+	}
+
+	static async updateStoryPointScale(
+		sessionCode: string,
+		storyPointScale: string[]
+	): Promise<ServerSession | null> {
+		const pool = getPool();
+
+		try {
+			await pool.query('UPDATE sessions SET story_point_scale = $1 WHERE session_code = $2', [
+				JSON.stringify(storyPointScale),
+				sessionCode
+			]);
+
+			console.log(
+				`[PostgresSessionStore] Updated story point scale in ${sessionCode}:`,
+				storyPointScale
+			);
+
+			return await this.getSession(sessionCode);
+		} catch (error) {
+			console.error(`[PostgresSessionStore] Error updating story point scale:`, error);
 			return null;
 		}
 	}

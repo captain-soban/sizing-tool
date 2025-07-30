@@ -5,7 +5,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import {
-		defaultStoryPointScales,
 		type Participant,
 		getRecentSessions,
 		addRecentSession,
@@ -75,21 +74,6 @@
 
 				// Connect to real-time updates
 				sessionClient.connectToRealtime(sessionCode);
-
-				// Load local session settings
-				const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
-				if (storedScale) {
-					if (storedScale === 'custom') {
-						const customScaleData = localStorage.getItem(`session_${sessionCode}_custom_scale`);
-						if (customScaleData) {
-							storyPointOptions = JSON.parse(customScaleData);
-						}
-					} else {
-						storyPointOptions =
-							defaultStoryPointScales[storedScale as keyof typeof defaultStoryPointScales] ||
-							storyPointOptions;
-					}
-				}
 
 				// Start heartbeat to show this participant is active
 				heartbeatInterval = window.setInterval(() => {
@@ -400,6 +384,12 @@
 		if (optionCount <= 10) return 'gap-1 sm:gap-1.5';
 		return 'gap-0.5 sm:gap-1';
 	}
+
+	// Check if all non-observer participants have voted
+	function allParticipantsVoted(): boolean {
+		const votingParticipants = participants.filter((p) => !p.isObserver);
+		return votingParticipants.length > 0 && votingParticipants.every((p) => p.voted);
+	}
 </script>
 
 <div class="min-h-screen p-4">
@@ -602,7 +592,13 @@
 										</div>
 										{#if isHost}
 											<div class="flex flex-wrap justify-center gap-2">
-												<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90">
+												<Button
+													onclick={revealVotes}
+													disabled={!allParticipantsVoted()}
+													class={allParticipantsVoted()
+														? 'bg-poker-red hover:bg-poker-red/90'
+														: 'cursor-not-allowed bg-gray-400'}
+												>
 													🎭 Reveal Votes
 												</Button>
 												<Button
