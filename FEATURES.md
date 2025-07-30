@@ -23,6 +23,7 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 - **User Roles**: Distinguish between session owner and participants
   -- Each user can switch from observer or active in the planning poker page
   --- Visual and text indicator if their active or observer
+  **Shareable Link** Share link button. When a user clicks the share link button it should copy a link that redirects a user that uses this link to the current session. it should ask the user for a name. if the user has previously joined the planning poker session provided in the link it should use the name previously used.
 
 ### Voting System
 - Real time voting

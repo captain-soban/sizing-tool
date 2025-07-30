@@ -3,7 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent } from '$lib/components/ui/card';
+	import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
 	import {
 		type Participant,
 		getRecentSessions,
@@ -11,6 +12,7 @@
 		updateRecentSessionTitle
 	} from '$lib/stores/session';
 	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
+	import { BrainCog, Share2, Eye, Vote } from '@lucide/svelte';
 
 	const sessionCode = $page.params.sessionCode!;
 
@@ -28,6 +30,8 @@
 	let tempTitle = $state('');
 	let sessionClient: SessionClient;
 	let heartbeatInterval: number | null = null;
+	let showNamePrompt = $state(false);
+	let tempPlayerName = $state('');
 
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
 
@@ -37,8 +41,9 @@
 		const currentSession = recentSessions.find((s) => s.sessionCode === sessionCode);
 
 		if (!currentSession) {
-			console.error('[Session] Session not found in recent data, redirecting to home');
-			goto('/');
+			// This is a shared link access - user hasn't joined this session before
+			console.log('[Session] New user accessing shared link, prompting for name');
+			showNamePrompt = true;
 			return;
 		}
 
@@ -53,39 +58,8 @@
 			sessionTitle: currentSession.sessionTitle
 		});
 
-		// Load observer status from localStorage (user preference)
-		const storedIsObserver =
-			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
-		isObserver = storedIsObserver;
-
-		// Initialize session client
-		sessionClient = new SessionClient();
-
-		// Set up real-time updates
-		sessionClient.onUpdate((sessionData: SessionData) => {
-			updateFromSessionData(sessionData);
-		});
-
-		(async () => {
-			try {
-				// Join or rejoin the session
-				const sessionData = await sessionClient.joinSession(sessionCode, playerName, isObserver);
-				updateFromSessionData(sessionData);
-
-				// Connect to real-time updates
-				sessionClient.connectToRealtime(sessionCode);
-
-				// Start heartbeat to show this participant is active
-				heartbeatInterval = window.setInterval(() => {
-					if (sessionClient) {
-						sessionClient.sendHeartbeat(sessionCode, playerName);
-					}
-				}, 5000); // Send heartbeat every 5 seconds
-			} catch (error) {
-				console.error('[Session] Error joining session:', error);
-				goto('/');
-			}
-		})();
+		// Continue with session initialization
+		initializeSession();
 
 		// Handle visibility changes to reconnect when user returns to tab
 		const handleVisibilityChange = () => {
@@ -146,6 +120,40 @@
 		}
 	});
 
+	async function initializeSession() {
+		// Load observer status from localStorage (user preference)
+		const storedIsObserver =
+			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
+		isObserver = storedIsObserver;
+
+		// Initialize session client
+		sessionClient = new SessionClient();
+
+		// Set up real-time updates
+		sessionClient.onUpdate((sessionData: SessionData) => {
+			updateFromSessionData(sessionData);
+		});
+
+		try {
+			// Join or rejoin the session
+			const sessionData = await sessionClient.joinSession(sessionCode, playerName, isObserver);
+			updateFromSessionData(sessionData);
+
+			// Connect to real-time updates
+			sessionClient.connectToRealtime(sessionCode);
+
+			// Start heartbeat to show this participant is active
+			heartbeatInterval = window.setInterval(() => {
+				if (sessionClient) {
+					sessionClient.sendHeartbeat(sessionCode, playerName);
+				}
+			}, 5000); // Send heartbeat every 5 seconds
+		} catch (error) {
+			console.error('[Session] Error joining session:', error);
+			goto('/');
+		}
+	}
+
 	function updateFromSessionData(sessionData: SessionData) {
 		sessionTitle = sessionData.title;
 		participants = sessionData.participants;
@@ -166,6 +174,61 @@
 	function saveSessionState() {
 		// Save individual session settings (not shared)
 		localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
+	}
+
+	async function copySessionLink() {
+		try {
+			const sessionUrl = `${window.location.origin}/session/${sessionCode}`;
+			await navigator.clipboard.writeText(sessionUrl);
+			// Simple visual feedback - could be enhanced with a toast notification
+			const button = document.querySelector('[title="Share session"]');
+			if (button) {
+				const originalTitle = button.getAttribute('title');
+				button.setAttribute('title', 'Copied to clipboard!');
+				setTimeout(() => {
+					button.setAttribute('title', originalTitle || 'Share session');
+				}, 2000);
+			}
+		} catch (err) {
+			console.error('Failed to copy session link:', err);
+			// Fallback for browsers that don't support clipboard API
+			alert(`Share this session code: ${sessionCode}`);
+		}
+	}
+
+	async function handleNameSubmit() {
+		if (!tempPlayerName.trim()) return;
+
+		try {
+			// Join the session with the provided name
+			const client = new SessionClient();
+			await client.joinSession(sessionCode, tempPlayerName.trim());
+
+			// Set the player name and continue with normal flow
+			playerName = tempPlayerName.trim();
+			isHost = false; // Shared link users are never hosts
+			showNamePrompt = false;
+
+			// Add to recent sessions for future use
+			addRecentSession({
+				sessionCode: sessionCode,
+				playerName: playerName,
+				isHost: false,
+				sessionTitle: undefined // Will be updated when session data loads
+			});
+
+			// Continue with normal session initialization
+			initializeSession();
+		} catch (err) {
+			console.error('[Session] Error joining session via shared link:', err);
+			// If session doesn't exist or there's an error, redirect to home
+			goto('/');
+		}
+	}
+
+	function handleNameCancel() {
+		// User cancelled name entry, redirect to home
+		goto('/');
 	}
 
 	async function toggleObserverMode() {
@@ -407,7 +470,6 @@
 							if (e.key === 'Enter') saveTitle();
 							if (e.key === 'Escape') cancelEditTitle();
 						}}
-						autofocus
 					/>
 					<div class="flex gap-1">
 						<Button
@@ -428,28 +490,41 @@
 					</div>
 				</div>
 			{:else}
-				<div class="group">
-					{#if isHost}
-						<button
-							type="button"
-							class="m-0 cursor-pointer rounded border-none bg-transparent p-0 text-left text-sm font-bold text-blue-700 transition-colors hover:text-blue-700/80 focus:text-blue-700/80 focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:outline-none sm:text-base lg:text-lg"
-							onclick={startEditingTitle}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault();
-									startEditingTitle();
-								}
-							}}
-							title="Click to edit title"
-						>
-							{sessionTitle}
-							<span class="ml-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
-								>✏️</span
+				<div class="group flex items-center gap-2">
+					<div class="flex-1">
+						{#if isHost}
+							<button
+								type="button"
+								class="m-0 cursor-pointer rounded border-none bg-transparent p-0 text-left text-sm font-bold text-blue-700 transition-colors hover:text-blue-700/80 focus:text-blue-700/80 focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:outline-none sm:text-base lg:text-lg"
+								onclick={startEditingTitle}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										startEditingTitle();
+									}
+								}}
+								title="Click to edit title"
 							>
-						</button>
-					{:else}
-						<h1 class="text-sm font-bold text-blue-700 sm:text-base lg:text-lg">{sessionTitle}</h1>
-					{/if}
+								{sessionTitle}
+								<span class="ml-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+									>✏️</span
+								>
+							</button>
+						{:else}
+							<h1 class="text-sm font-bold text-blue-700 sm:text-base lg:text-lg">
+								{sessionTitle}
+							</h1>
+						{/if}
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						class="btn-poker-gray h-6 w-6 p-0 sm:h-7 sm:w-7"
+						title="Share session"
+						onclick={copySessionLink}
+					>
+						<Share2 class="h-3 w-3 sm:h-4 sm:w-4" />
+					</Button>
 				</div>
 			{/if}
 			<p class="text-xs text-gray-600">Session: {sessionCode}</p>
@@ -471,7 +546,11 @@
 				? 'border-orange-300 bg-orange-100 text-orange-800 hover:bg-orange-200'
 				: 'border-green-300 bg-green-100 text-green-800 hover:bg-green-200'}
 		>
-			{isObserver ? '👁️ Observer' : '🗳️ Participant'}
+			{#if isObserver}
+				<Eye class="mr-1 h-4 w-4" /> Observer
+			{:else}
+				<Vote class="mr-1 h-4 w-4" /> Participant
+			{/if}
 		</Button>
 		<Button variant="outline" size="icon" onclick={goToSettings} class="btn-poker-gray">⚙️</Button>
 		<Button variant="outline" onclick={exitSession} class="btn-poker-gray">Exit</Button>
@@ -684,9 +763,10 @@
 											</div>
 										{:else if votingInProgress}
 											<div
-												class="thinking rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 sm:px-2 sm:py-1 sm:text-[10px]"
+												class="thinking rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 sm:px-2 sm:py-1 sm:text-[10px] flex items-center gap-1"
 											>
-												🤔 Thinking
+												<BrainCog size={16} color="#e52424" strokeWidth={1} />
+												Thinking
 											</div>
 										{:else}
 											<div
@@ -747,6 +827,51 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Name Prompt Modal for Shared Links -->
+{#if showNamePrompt}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<Card class="w-full max-w-md work-area">
+			<CardHeader>
+				<div class="flex justify-center">
+					<img src="/logo.svg" alt="Planning Poker Logo" class="h-12 w-auto" />
+				</div>
+				<h2 class="text-center text-lg font-semibold text-gray-900">Join Planning Session</h2>
+				<p class="text-center text-sm text-gray-600">
+					You've been invited to join session <strong>{sessionCode}</strong>
+				</p>
+			</CardHeader>
+			<CardContent class="space-y-4">
+				<div class="space-y-2">
+					<label for="sharedPlayerName" class="text-sm font-medium">Your Name</label>
+					<Input 
+						id="sharedPlayerName" 
+						type="text" 
+						bind:value={tempPlayerName} 
+						placeholder="Enter your name"
+						onkeydown={(e) => e.key === 'Enter' && handleNameSubmit()}
+					/>
+				</div>
+				<div class="flex space-x-3">
+					<Button
+						onclick={handleNameSubmit}
+						disabled={!tempPlayerName.trim()}
+						class="bg-poker-blue hover:bg-poker-blue/90 flex-1"
+					>
+						Join Session
+					</Button>
+					<Button
+						variant="outline"
+						onclick={handleNameCancel}
+						class="btn-poker-gray flex-1"
+					>
+						Cancel
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
+	</div>
+{/if}
 
 <style>
 	@keyframes pulse {

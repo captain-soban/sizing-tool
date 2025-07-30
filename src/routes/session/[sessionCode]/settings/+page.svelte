@@ -5,6 +5,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio';
 	import { defaultStoryPointScales, getRecentSessions } from '$lib/stores/session';
 	import { SessionClient } from '$lib/api/sessionClient';
 
@@ -154,7 +156,7 @@
 		<CardContent class="space-y-6">
 			<!-- Session Title -->
 			<div class="space-y-2">
-				<label for="sessionTitle" class="text-sm font-medium">Session Title</label>
+				<Label for="sessionTitle">Session Title</Label>
 				<Input
 					id="sessionTitle"
 					type="text"
@@ -169,20 +171,17 @@
 
 			<!-- Story Point Scale -->
 			<div class="space-y-4">
-				<label class="text-sm font-medium">Story Point Scale</label>
+				<fieldset>
+					<legend class="text-sm font-medium">Story Point Scale</legend>
 
-				<div class="space-y-3">
-					{#each Object.entries(defaultStoryPointScales) as [key, scale] (key)}
-						<div class="flex items-center space-x-3">
-							<input
-								type="radio"
-								id={key}
-								bind:group={selectedScale}
+					<RadioGroup disabled={!isHost} class="space-y-3">
+						{#each Object.entries(defaultStoryPointScales) as [key, scale] (key)}
+							<RadioGroupItem
 								value={key}
+								groupValue={selectedScale}
+								onValueChange={(value) => (selectedScale = value)}
 								disabled={!isHost}
-								class="text-poker-blue focus:ring-poker-blue h-4 w-4"
-							/>
-							<label for={key} class="flex-1 cursor-pointer">
+							>
 								<div class="font-medium capitalize">
 									{key
 										.replace('-', ' ')
@@ -192,35 +191,35 @@
 								<div class="text-muted-foreground text-sm">
 									{scale.join(', ')}
 								</div>
-							</label>
-						</div>
-					{/each}
+							</RadioGroupItem>
+						{/each}
 
-					<!-- Custom Scale Option -->
-					<div class="flex items-start space-x-3">
-						<input
-							type="radio"
-							id="custom"
-							bind:group={selectedScale}
-							value="custom"
-							disabled={!isHost}
-							class="text-poker-blue focus:ring-poker-blue mt-1 h-4 w-4"
-						/>
-						<div class="flex-1">
-							<label for="custom" class="cursor-pointer font-medium">Custom Scale</label>
-							<Input
-								type="text"
-								bind:value={customScale}
-								placeholder="Enter comma-separated values (e.g., 1, 2, 4, 8, 16)"
-								disabled={!isHost || selectedScale !== 'custom'}
-								class="mt-2"
-							/>
-							<div class="text-muted-foreground mt-1 text-sm">
-								Preview: {getScalePreview('custom')}
-							</div>
+						<!-- Custom Scale Option -->
+						<div class="space-y-2">
+							<RadioGroupItem
+								value="custom"
+								groupValue={selectedScale}
+								onValueChange={(value) => (selectedScale = value)}
+								disabled={!isHost}
+								class="items-start"
+							>
+								<div class="flex-1">
+									<div class="font-medium">Custom Scale</div>
+									<Input
+										type="text"
+										bind:value={customScale}
+										placeholder="Enter comma-separated values (e.g., 1, 2, 4, 8, 16)"
+										disabled={!isHost || selectedScale !== 'custom'}
+										class="mt-2"
+									/>
+									<div class="text-muted-foreground mt-1 text-sm">
+										Preview: {getScalePreview('custom')}
+									</div>
+								</div>
+							</RadioGroupItem>
 						</div>
-					</div>
-				</div>
+					</RadioGroup>
+				</fieldset>
 			</div>
 
 			<!-- Action Buttons -->
