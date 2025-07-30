@@ -27,7 +27,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		} while (await PostgresSessionStore.getSession(sessionCode));
 
-		const session = await PostgresSessionStore.createSession(sessionCode, hostName, userId, title, storyPointScale);
+		const session = await PostgresSessionStore.createSession(
+			sessionCode,
+			hostName,
+			userId,
+			title,
+			storyPointScale
+		);
 
 		return json({
 			sessionCode: session.sessionCode,

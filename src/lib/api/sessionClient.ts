@@ -15,7 +15,11 @@ export class SessionClient {
 	private updateCallbacks: ((session: SessionData) => void)[] = [];
 
 	// Create new session
-	async createSession(hostName: string, title?: string, storyPointScale?: string[]): Promise<SessionData> {
+	async createSession(
+		hostName: string,
+		title?: string,
+		storyPointScale?: string[]
+	): Promise<SessionData> {
 		const userId = getUserId();
 		const response = await fetch('/api/sessions', {
 			method: 'POST',
