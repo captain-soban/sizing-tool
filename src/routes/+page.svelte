@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
 	import { SessionClient } from '$lib/api/sessionClient';
 	import SessionSetupModal from '$lib/components/SessionSetupModal.svelte';
@@ -42,11 +42,7 @@
 		error = '';
 
 		try {
-			const session = await sessionClient.createSession(
-				playerName.trim(), 
-				title, 
-				scale
-			);
+			const session = await sessionClient.createSession(playerName.trim(), title, scale);
 
 			// Add to recent sessions
 			addRecentSession({
@@ -293,9 +289,9 @@
 </div>
 
 <!-- Session Setup Modal -->
-<SessionSetupModal 
+<SessionSetupModal
 	bind:show={showSetupModal}
-	playerName={playerName}
+	{playerName}
 	onCancel={handleModalCancel}
 	onConfirm={handleSessionSetup}
 />

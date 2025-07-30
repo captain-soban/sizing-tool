@@ -167,9 +167,7 @@ if (typeof window === 'undefined') {
 	// Only run on server side
 	initDatabase().catch((error) => {
 		log.databaseError('Failed to initialize', error);
-		log.error(
-			'Please ensure PostgreSQL is running and the connection settings are correct'
-		);
+		log.error('Please ensure PostgreSQL is running and the connection settings are correct');
 		log.error('Check your .env file or create one based on .env.example');
 	});
 

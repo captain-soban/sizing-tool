@@ -13,10 +13,10 @@ export interface ServerSession {
 
 export class PostgresSessionStore {
 	static async createSession(
-		sessionCode: string, 
-		hostName: string, 
-		userId: string, 
-		title?: string, 
+		sessionCode: string,
+		hostName: string,
+		userId: string,
+		title?: string,
 		storyPointScale?: string[]
 	): Promise<ServerSession> {
 		const pool = getPool();
@@ -27,9 +27,9 @@ export class PostgresSessionStore {
 			// Create session with provided title and scale
 			const sessionTitle = title || 'Sprint Planning Session';
 			const scale = storyPointScale || ['0', '1', '2', '3', '5', '8', '?'];
-			
+
 			await pool.query(
-				`INSERT INTO sessions (session_code, title, story_point_scale) VALUES ($1, $2, $3)`, 
+				`INSERT INTO sessions (session_code, title, story_point_scale) VALUES ($1, $2, $3)`,
 				[sessionCode, sessionTitle, JSON.stringify(scale)]
 			);
 
@@ -42,7 +42,9 @@ export class PostgresSessionStore {
 
 			await pool.query('COMMIT');
 
-			console.log(`[PostgresSessionStore] Created session ${sessionCode} with host ${hostName} (userId: ${userId})`);
+			console.log(
+				`[PostgresSessionStore] Created session ${sessionCode} with host ${hostName} (userId: ${userId})`
+			);
 
 			// Return the created session
 			return (await this.getSession(sessionCode)) as ServerSession;
@@ -150,7 +152,9 @@ export class PostgresSessionStore {
 				[sessionCode, playerName, userId, shouldBeHost, isObserver]
 			);
 
-			console.log(`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode} (userId: ${userId}, host: ${shouldBeHost})`);
+			console.log(
+				`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode} (userId: ${userId}, host: ${shouldBeHost})`
+			);
 
 			return await this.getSession(sessionCode);
 		} catch (error) {
