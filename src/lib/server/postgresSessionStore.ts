@@ -12,7 +12,11 @@ export interface ServerSession {
 }
 
 export class PostgresSessionStore {
-	static async createSession(sessionCode: string, hostName: string, userId: string): Promise<ServerSession> {
+	static async createSession(
+		sessionCode: string,
+		hostName: string,
+		userId: string
+	): Promise<ServerSession> {
 		const pool = getPool();
 
 		try {
@@ -33,7 +37,9 @@ export class PostgresSessionStore {
 
 			await pool.query('COMMIT');
 
-			console.log(`[PostgresSessionStore] Created session ${sessionCode} with host ${hostName} (userId: ${userId})`);
+			console.log(
+				`[PostgresSessionStore] Created session ${sessionCode} with host ${hostName} (userId: ${userId})`
+			);
 
 			// Return the created session
 			return (await this.getSession(sessionCode)) as ServerSession;
@@ -141,7 +147,9 @@ export class PostgresSessionStore {
 				[sessionCode, playerName, userId, shouldBeHost, isObserver]
 			);
 
-			console.log(`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode} (userId: ${userId}, host: ${shouldBeHost})`);
+			console.log(
+				`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode} (userId: ${userId}, host: ${shouldBeHost})`
+			);
 
 			return await this.getSession(sessionCode);
 		} catch (error) {

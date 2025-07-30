@@ -50,11 +50,7 @@ const consoleTransport = new winston.transports.Console({
 const logger = winston.createLogger({
 	level: dev ? 'debug' : 'info',
 	format: logFormat,
-	transports: [
-		fileRotateTransport,
-		errorFileRotateTransport,
-		...(dev ? [consoleTransport] : [])
-	],
+	transports: [fileRotateTransport, errorFileRotateTransport, ...(dev ? [consoleTransport] : [])],
 	// Handle uncaught exceptions and rejections
 	exceptionHandlers: [
 		new DailyRotateFile({
@@ -87,24 +83,26 @@ if (!dev) {
 
 // Create structured logging functions
 export const log = {
-	error: (message: string, meta?: any) => logger.error(message, meta),
-	warn: (message: string, meta?: any) => logger.warn(message, meta),
-	info: (message: string, meta?: any) => logger.info(message, meta),
-	debug: (message: string, meta?: any) => logger.debug(message, meta),
+	error: (message: string, meta?: unknown) => logger.error(message, meta),
+	warn: (message: string, meta?: unknown) => logger.warn(message, meta),
+	info: (message: string, meta?: unknown) => logger.info(message, meta),
+	debug: (message: string, meta?: unknown) => logger.debug(message, meta),
 
 	// Specific logging functions for different components
-	database: (message: string, meta?: any) => logger.info(`[Database] ${message}`, meta),
-	session: (message: string, meta?: any) => logger.info(`[Session] ${message}`, meta),
-	sse: (message: string, meta?: any) => logger.info(`[SSE] ${message}`, meta),
-	api: (message: string, meta?: any) => logger.info(`[API] ${message}`, meta),
-	admin: (message: string, meta?: any) => logger.info(`[Admin] ${message}`, meta),
+	database: (message: string, meta?: unknown) => logger.info(`[Database] ${message}`, meta),
+	session: (message: string, meta?: unknown) => logger.info(`[Session] ${message}`, meta),
+	sse: (message: string, meta?: unknown) => logger.info(`[SSE] ${message}`, meta),
+	api: (message: string, meta?: unknown) => logger.info(`[API] ${message}`, meta),
+	admin: (message: string, meta?: unknown) => logger.info(`[Admin] ${message}`, meta),
 
 	// Error logging functions
-	databaseError: (message: string, error?: any) => logger.error(`[Database] ${message}`, { error }),
-	sessionError: (message: string, error?: any) => logger.error(`[Session] ${message}`, { error }),
-	sseError: (message: string, error?: any) => logger.error(`[SSE] ${message}`, { error }),
-	apiError: (message: string, error?: any) => logger.error(`[API] ${message}`, { error }),
-	adminError: (message: string, error?: any) => logger.error(`[Admin] ${message}`, { error })
+	databaseError: (message: string, error?: unknown) =>
+		logger.error(`[Database] ${message}`, { error }),
+	sessionError: (message: string, error?: unknown) =>
+		logger.error(`[Session] ${message}`, { error }),
+	sseError: (message: string, error?: unknown) => logger.error(`[SSE] ${message}`, { error }),
+	apiError: (message: string, error?: unknown) => logger.error(`[API] ${message}`, { error }),
+	adminError: (message: string, error?: unknown) => logger.error(`[Admin] ${message}`, { error })
 };
 
 export default logger;

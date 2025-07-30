@@ -14,11 +14,11 @@ const getLogFileName = () => {
 };
 
 // Format log entry
-const formatLogEntry = (level: string, args: any[]) => {
+const formatLogEntry = (level: string, args: unknown[]) => {
 	const timestamp = new Date().toISOString();
-	const message = args.map(arg => 
-		typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-	).join(' ');
+	const message = args
+		.map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)))
+		.join(' ');
 	return `${timestamp} [${level.toUpperCase()}] ${message}\n`;
 };
 
@@ -26,7 +26,7 @@ const formatLogEntry = (level: string, args: any[]) => {
 const writeToFile = (content: string) => {
 	try {
 		fs.appendFileSync(getLogFileName(), content);
-	} catch (error) {
+	} catch {
 		// Silently fail to avoid infinite loops
 	}
 };
@@ -40,27 +40,27 @@ const originalConsole = {
 	debug: console.debug
 };
 
-console.log = (...args: any[]) => {
+console.log = (...args: unknown[]) => {
 	originalConsole.log(...args);
 	writeToFile(formatLogEntry('info', args));
 };
 
-console.error = (...args: any[]) => {
+console.error = (...args: unknown[]) => {
 	originalConsole.error(...args);
 	writeToFile(formatLogEntry('error', args));
 };
 
-console.warn = (...args: any[]) => {
+console.warn = (...args: unknown[]) => {
 	originalConsole.warn(...args);
 	writeToFile(formatLogEntry('warn', args));
 };
 
-console.info = (...args: any[]) => {
+console.info = (...args: unknown[]) => {
 	originalConsole.info(...args);
 	writeToFile(formatLogEntry('info', args));
 };
 
-console.debug = (...args: any[]) => {
+console.debug = (...args: unknown[]) => {
 	originalConsole.debug(...args);
 	writeToFile(formatLogEntry('debug', args));
 };

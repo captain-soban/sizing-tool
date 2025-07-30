@@ -17,7 +17,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			return json({ error: 'User ID is required' }, { status: 400 });
 		}
 
-		const session = await PostgresSessionStore.joinSession(sessionCode, playerName, userId, isObserver);
+		const session = await PostgresSessionStore.joinSession(
+			sessionCode,
+			playerName,
+			userId,
+			isObserver
+		);
 
 		if (!session) {
 			return json({ error: 'Session not found' }, { status: 404 });
