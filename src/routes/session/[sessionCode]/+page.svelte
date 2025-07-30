@@ -763,7 +763,7 @@
 											</div>
 										{:else if votingInProgress}
 											<div
-												class="thinking rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 sm:px-2 sm:py-1 sm:text-[10px] flex items-center gap-1"
+												class="thinking flex items-center gap-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700 sm:px-2 sm:py-1 sm:text-[10px]"
 											>
 												<BrainCog size={16} color="#e52424" strokeWidth={1} />
 												Thinking
@@ -831,7 +831,7 @@
 <!-- Name Prompt Modal for Shared Links -->
 {#if showNamePrompt}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-		<Card class="w-full max-w-md work-area">
+		<Card class="work-area w-full max-w-md">
 			<CardHeader>
 				<div class="flex justify-center">
 					<img src="/logo.svg" alt="Planning Poker Logo" class="h-12 w-auto" />
@@ -844,10 +844,10 @@
 			<CardContent class="space-y-4">
 				<div class="space-y-2">
 					<label for="sharedPlayerName" class="text-sm font-medium">Your Name</label>
-					<Input 
-						id="sharedPlayerName" 
-						type="text" 
-						bind:value={tempPlayerName} 
+					<Input
+						id="sharedPlayerName"
+						type="text"
+						bind:value={tempPlayerName}
 						placeholder="Enter your name"
 						onkeydown={(e) => e.key === 'Enter' && handleNameSubmit()}
 					/>
@@ -860,11 +860,7 @@
 					>
 						Join Session
 					</Button>
-					<Button
-						variant="outline"
-						onclick={handleNameCancel}
-						class="btn-poker-gray flex-1"
-					>
+					<Button variant="outline" onclick={handleNameCancel} class="btn-poker-gray flex-1">
 						Cancel
 					</Button>
 				</div>
