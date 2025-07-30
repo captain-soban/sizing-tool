@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
 import { dev } from '$app/environment';
+import { log } from './logger.js';
+import './consoleCapture.js'; // Capture console logs to file
 
 // Database connection pool
 let pool: Pool;
@@ -23,14 +25,12 @@ export function getPool(): Pool {
 			ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 		});
 
-		// Log connection info in development
-		if (dev) {
-			console.log('[Database] Initializing PostgreSQL connection pool');
-		}
+		// Log connection info
+		log.database('Initializing PostgreSQL connection pool');
 
 		// Handle pool errors
 		pool.on('error', (err) => {
-			console.error('[Database] Unexpected error on idle client', err);
+			log.databaseError('Unexpected error on idle client', err);
 		});
 	}
 
@@ -63,6 +63,7 @@ export async function initDatabase() {
 				id SERIAL PRIMARY KEY,
 				session_code VARCHAR(8) NOT NULL REFERENCES sessions(session_code) ON DELETE CASCADE,
 				name VARCHAR(100) NOT NULL,
+				user_id VARCHAR(50),
 				voted BOOLEAN NOT NULL DEFAULT FALSE,
 				vote VARCHAR(10),
 				is_host BOOLEAN NOT NULL DEFAULT FALSE,
@@ -73,12 +74,21 @@ export async function initDatabase() {
 			)
 		`);
 
+		// Add user_id column if it doesn't exist (for existing installations)
+		await pool.query(`
+			ALTER TABLE participants 
+			ADD COLUMN IF NOT EXISTS user_id VARCHAR(50)
+		`);
+
 		// Create indexes for better performance
 		await pool.query(`
 			CREATE INDEX IF NOT EXISTS idx_participants_session_code ON participants(session_code);
 		`);
 		await pool.query(`
 			CREATE INDEX IF NOT EXISTS idx_participants_last_seen ON participants(last_seen);
+		`);
+		await pool.query(`
+			CREATE INDEX IF NOT EXISTS idx_participants_user_id ON participants(user_id);
 		`);
 		await pool.query(`
 			CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at);
@@ -105,10 +115,10 @@ export async function initDatabase() {
 		`);
 
 		if (dev) {
-			console.log('[Database] Schema initialized successfully');
+			log.database('Schema initialized successfully');
 		}
 	} catch (error) {
-		console.error('[Database] Error initializing schema:', error);
+		log.databaseError('Error initializing schema', error);
 		throw error;
 	}
 }
@@ -133,12 +143,12 @@ export async function cleanupDatabase() {
 		`);
 
 		if (dev && ((inactiveParticipants.rowCount || 0) > 0 || (oldSessions.rowCount || 0) > 0)) {
-			console.log(
-				`[Database] Cleanup: removed ${inactiveParticipants.rowCount || 0} inactive participants, ${oldSessions.rowCount || 0} old sessions`
+			log.database(
+				`Cleanup: removed ${inactiveParticipants.rowCount || 0} inactive participants, ${oldSessions.rowCount || 0} old sessions`
 			);
 		}
 	} catch (error) {
-		console.error('[Database] Error during cleanup:', error);
+		log.databaseError('Error during cleanup', error);
 	}
 }
 
@@ -147,7 +157,7 @@ export async function closeDatabase() {
 	if (pool) {
 		await pool.end();
 		if (dev) {
-			console.log('[Database] Connection pool closed');
+			log.database('Connection pool closed');
 		}
 	}
 }
@@ -156,11 +166,11 @@ export async function closeDatabase() {
 if (typeof window === 'undefined') {
 	// Only run on server side
 	initDatabase().catch((error) => {
-		console.error('[Database] Failed to initialize:', error);
-		console.error(
-			'[Database] Please ensure PostgreSQL is running and the connection settings are correct'
+		log.databaseError('Failed to initialize', error);
+		log.error(
+			'Please ensure PostgreSQL is running and the connection settings are correct'
 		);
-		console.error('[Database] Check your .env file or create one based on .env.example');
+		log.error('Check your .env file or create one based on .env.example');
 	});
 
 	// Run cleanup every 5 minutes

@@ -57,3 +57,6 @@ vitest.config.ts
 
 # Database files
 test-db.js
+
+# Log files (but keep logs directory structure)
+logs/*.log

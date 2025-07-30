@@ -7,13 +7,17 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async ({ params, request }) => {
 	try {
 		const { sessionCode } = params;
-		const { playerName, isObserver = false } = await request.json();
+		const { playerName, userId, isObserver = false } = await request.json();
 
 		if (!playerName || typeof playerName !== 'string') {
 			return json({ error: 'Player name is required' }, { status: 400 });
 		}
 
-		const session = await PostgresSessionStore.joinSession(sessionCode, playerName, isObserver);
+		if (!userId || typeof userId !== 'string') {
+			return json({ error: 'User ID is required' }, { status: 400 });
+		}
+
+		const session = await PostgresSessionStore.joinSession(sessionCode, playerName, userId, isObserver);
 
 		if (!session) {
 			return json({ error: 'Session not found' }, { status: 404 });

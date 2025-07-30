@@ -87,12 +87,28 @@
 	}
 
 	async function joinRecentSession(recentSession: RecentSession) {
-		// Set the form data
-		playerName = recentSession.playerName;
-		sessionCode = recentSession.sessionCode;
+		isJoining = true;
+		error = '';
 
-		// Join the session
-		await joinSession();
+		try {
+			const upperSessionCode = recentSession.sessionCode.toUpperCase();
+			await sessionClient.joinSession(upperSessionCode, recentSession.playerName);
+
+			// Update recent session with preserved host status
+			addRecentSession({
+				sessionCode: upperSessionCode,
+				playerName: recentSession.playerName,
+				isHost: recentSession.isHost, // Preserve original host status
+				sessionTitle: recentSession.sessionTitle
+			});
+
+			goto(`/session/${upperSessionCode}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to join session';
+			console.error('[Landing] Error joining recent session:', err);
+		} finally {
+			isJoining = false;
+		}
 	}
 
 	function formatLastAccessed(timestamp: number): string {

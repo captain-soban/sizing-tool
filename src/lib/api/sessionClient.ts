@@ -1,4 +1,5 @@
 import type { Participant, VotingState } from '$lib/stores/session';
+import { getUserId } from '$lib/stores/session';
 
 export interface SessionData {
 	sessionCode: string;
@@ -15,10 +16,11 @@ export class SessionClient {
 
 	// Create new session
 	async createSession(hostName: string): Promise<SessionData> {
+		const userId = getUserId();
 		const response = await fetch('/api/sessions', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ hostName })
+			body: JSON.stringify({ hostName, userId })
 		});
 
 		if (!response.ok) {
@@ -35,10 +37,11 @@ export class SessionClient {
 		playerName: string,
 		isObserver = false
 	): Promise<SessionData> {
+		const userId = getUserId();
 		const response = await fetch(`/api/sessions/${sessionCode}/join`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ playerName, isObserver })
+			body: JSON.stringify({ playerName, userId, isObserver })
 		});
 
 		if (!response.ok) {

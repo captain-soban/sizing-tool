@@ -8,6 +8,8 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@db:5432/planning_poker
+    volumes:
+      - app_logs:/app/logs
     depends_on:
       db:
         condition: service_healthy
@@ -32,3 +34,4 @@ services:
 
 volumes:
   postgres_data:
+  app_logs:

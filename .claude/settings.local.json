@@ -26,7 +26,11 @@
       "Bash(rg:*)",
       "Bash(grep:*)",
       "Bash(git merge:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(git branch:*)",
+      "Bash(true)",
+      "Bash(cmd //c:*)",
+      "Bash(Get-Content \"C:\\Users\\acejo\\Documents\\Projects\\sizing-tool\\logs\\console-2025-07-29.log\" -Tail 20)"
     ],
     "deny": []
   }

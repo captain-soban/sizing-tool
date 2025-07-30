@@ -12,7 +12,7 @@ export interface ServerSession {
 }
 
 export class PostgresSessionStore {
-	static async createSession(sessionCode: string, hostName: string): Promise<ServerSession> {
+	static async createSession(sessionCode: string, hostName: string, userId: string): Promise<ServerSession> {
 		const pool = getPool();
 
 		try {
@@ -26,14 +26,14 @@ export class PostgresSessionStore {
 
 			// Add host participant
 			await pool.query(
-				`INSERT INTO participants (session_code, name, is_host, last_seen) 
-				 VALUES ($1, $2, $3, NOW())`,
-				[sessionCode, hostName, true]
+				`INSERT INTO participants (session_code, name, user_id, is_host, last_seen) 
+				 VALUES ($1, $2, $3, $4, NOW())`,
+				[sessionCode, hostName, userId, true]
 			);
 
 			await pool.query('COMMIT');
 
-			console.log(`[PostgresSessionStore] Created session ${sessionCode} with host ${hostName}`);
+			console.log(`[PostgresSessionStore] Created session ${sessionCode} with host ${hostName} (userId: ${userId})`);
 
 			// Return the created session
 			return (await this.getSession(sessionCode)) as ServerSession;
@@ -64,7 +64,7 @@ export class PostgresSessionStore {
 
 			// Get participants
 			const participantsResult = await pool.query(
-				`SELECT name, voted, vote, is_host, is_observer, 
+				`SELECT name, user_id, voted, vote, is_host, is_observer, 
 						EXTRACT(EPOCH FROM last_seen) * 1000 as last_seen
 				 FROM participants 
 				 WHERE session_code = $1 
@@ -78,7 +78,8 @@ export class PostgresSessionStore {
 				vote: row.vote,
 				isHost: row.is_host,
 				isObserver: row.is_observer,
-				lastSeen: row.last_seen
+				lastSeen: row.last_seen,
+				userId: row.user_id
 			}));
 
 			const session: ServerSession = {
@@ -106,6 +107,7 @@ export class PostgresSessionStore {
 	static async joinSession(
 		sessionCode: string,
 		playerName: string,
+		userId: string,
 		isObserver = false
 	): Promise<ServerSession | null> {
 		const pool = getPool();
@@ -121,16 +123,25 @@ export class PostgresSessionStore {
 				return null;
 			}
 
-			// Insert or update participant
-			await pool.query(
-				`INSERT INTO participants (session_code, name, is_observer, last_seen)
-				 VALUES ($1, $2, $3, NOW())
-				 ON CONFLICT (session_code, name)
-				 DO UPDATE SET is_observer = $3, last_seen = NOW()`,
-				[sessionCode, playerName, isObserver]
+			// Check if this user is already the host of this session
+			const existingHost = await pool.query(
+				`SELECT is_host FROM participants 
+				 WHERE session_code = $1 AND user_id = $2 AND is_host = true`,
+				[sessionCode, userId]
 			);
 
-			console.log(`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode}`);
+			const shouldBeHost = existingHost.rows.length > 0;
+
+			// Insert or update participant
+			await pool.query(
+				`INSERT INTO participants (session_code, name, user_id, is_host, is_observer, last_seen)
+				 VALUES ($1, $2, $3, $4, $5, NOW())
+				 ON CONFLICT (session_code, name)
+				 DO UPDATE SET user_id = $3, is_host = $4, is_observer = $5, last_seen = NOW()`,
+				[sessionCode, playerName, userId, shouldBeHost, isObserver]
+			);
+
+			console.log(`[PostgresSessionStore] Player ${playerName} joined session ${sessionCode} (userId: ${userId}, host: ${shouldBeHost})`);
 
 			return await this.getSession(sessionCode);
 		} catch (error) {

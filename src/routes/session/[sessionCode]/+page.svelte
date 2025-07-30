@@ -601,9 +601,14 @@
 											).length} votes cast
 										</div>
 										{#if isHost}
-											<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90">
-												🎭 Reveal Votes
-											</Button>
+											<div class="flex flex-wrap justify-center gap-2">
+												<Button onclick={revealVotes} class="bg-poker-red hover:bg-poker-red/90">
+													🎭 Reveal Votes
+												</Button>
+												<Button onclick={startNewVoting} variant="outline" size="sm" class="btn-poker-gray text-xs sm:text-sm">
+													🔄 Restart
+												</Button>
+											</div>
 										{/if}
 									</div>
 								{:else}
