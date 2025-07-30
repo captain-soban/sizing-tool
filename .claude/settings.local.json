@@ -42,7 +42,12 @@
       "Bash(set PGUSER=postgres)",
       "Bash(set PGPASSWORD=)",
       "Bash(createdb:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(npm run test:unit:*)",
+      "Bash(pkill:*)",
+      "Bash(ls:*)",
+      "Bash(timeout 5 npm run dev)",
+      "WebFetch(domain:lucide.dev)"
     ],
     "deny": []
   }
