@@ -35,6 +35,22 @@
 			const sessionData = await sessionClient.getSession(sessionCode);
 			sessionTitle = sessionData.title;
 			originalTitle = sessionData.title;
+
+			// Load current scale from server
+			if (sessionData.storyPointScale) {
+				// Check if it matches a predefined scale
+				const matchingScale = Object.entries(defaultStoryPointScales).find(
+					([, scale]) => JSON.stringify(scale) === JSON.stringify(sessionData.storyPointScale)
+				);
+
+				if (matchingScale) {
+					selectedScale = matchingScale[0];
+				} else {
+					// It's a custom scale
+					selectedScale = 'custom';
+					customScale = sessionData.storyPointScale.join(', ');
+				}
+			}
 		} catch (error) {
 			console.error('[Settings] Error loading session:', error);
 			// Fallback to localStorage
@@ -43,11 +59,24 @@
 				sessionTitle = storedTitle;
 				originalTitle = storedTitle;
 			}
-		}
 
-		// Load scale settings from localStorage (these are still local preferences)
-		const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
-		if (storedScale) selectedScale = storedScale;
+			// Load scale settings from localStorage as fallback
+			const storedScale = localStorage.getItem(`session_${sessionCode}_scale`);
+			if (storedScale) {
+				selectedScale = storedScale;
+				if (storedScale === 'custom') {
+					const customScaleData = localStorage.getItem(`session_${sessionCode}_custom_scale`);
+					if (customScaleData) {
+						try {
+							const customScaleArray = JSON.parse(customScaleData);
+							customScale = customScaleArray.join(', ');
+						} catch (e) {
+							console.error('[Settings] Error parsing custom scale:', e);
+						}
+					}
+				}
+			}
+		}
 	});
 
 	async function saveSettings() {
@@ -57,7 +86,26 @@
 				await sessionClient.updateSessionTitle(sessionCode, sessionTitle);
 			}
 
-			// Save local preferences to localStorage
+			// Update story point scale on server if host
+			if (isHost && sessionClient) {
+				let scaleArray: string[];
+
+				if (selectedScale === 'custom' && customScale) {
+					scaleArray = customScale
+						.split(',')
+						.map((s) => s.trim())
+						.filter((s) => s);
+				} else {
+					scaleArray =
+						defaultStoryPointScales[selectedScale as keyof typeof defaultStoryPointScales];
+				}
+
+				if (scaleArray && scaleArray.length > 0) {
+					await sessionClient.updateStoryPointScale(sessionCode, scaleArray);
+				}
+			}
+
+			// Save local preferences to localStorage (for non-hosts or as backup)
 			localStorage.setItem(`session_${sessionCode}_scale`, selectedScale);
 
 			if (selectedScale === 'custom' && customScale) {
@@ -137,7 +185,7 @@
 							<label for={key} class="flex-1 cursor-pointer">
 								<div class="font-medium capitalize">
 									{key
-										.replace('_', ' ')
+										.replace('-', ' ')
 										.replace('fibonacci', 'Fibonacci')
 										.replace('tshirt', 'T-Shirt')}
 								</div>

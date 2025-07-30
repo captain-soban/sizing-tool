@@ -33,26 +33,32 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		const { sessionCode } = params;
 		const updates = await request.json();
 
+		let session = null;
+
 		if (updates.title && typeof updates.title === 'string') {
-			const session = await PostgresSessionStore.updateSessionTitle(sessionCode, updates.title);
-			if (!session) {
-				return json({ error: 'Session not found' }, { status: 404 });
-			}
-
-			// Broadcast update to all connected clients
-			await broadcastSessionUpdate(sessionCode);
-
-			return json({
-				sessionCode: session.sessionCode,
-				title: session.title,
-				participants: session.participants,
-				votingState: session.votingState,
-				storyPointScale: session.storyPointScale,
-				lastUpdated: session.lastUpdated
-			});
+			session = await PostgresSessionStore.updateSessionTitle(sessionCode, updates.title);
+		} else if (updates.storyPointScale && Array.isArray(updates.storyPointScale)) {
+			session = await PostgresSessionStore.updateStoryPointScale(
+				sessionCode,
+				updates.storyPointScale
+			);
 		}
 
-		return json({ error: 'Invalid update data' }, { status: 400 });
+		if (!session) {
+			return json({ error: 'Session not found or invalid update data' }, { status: 404 });
+		}
+
+		// Broadcast update to all connected clients
+		await broadcastSessionUpdate(sessionCode);
+
+		return json({
+			sessionCode: session.sessionCode,
+			title: session.title,
+			participants: session.participants,
+			votingState: session.votingState,
+			storyPointScale: session.storyPointScale,
+			lastUpdated: session.lastUpdated
+		});
 	} catch (error) {
 		console.error('[API] Error updating session:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
