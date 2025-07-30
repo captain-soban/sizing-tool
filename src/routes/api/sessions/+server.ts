@@ -6,10 +6,14 @@ import type { RequestHandler } from './$types';
 // POST /api/sessions - Create new session
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const { hostName } = await request.json();
+		const { hostName, userId } = await request.json();
 
 		if (!hostName || typeof hostName !== 'string') {
 			return json({ error: 'Host name is required' }, { status: 400 });
+		}
+
+		if (!userId || typeof userId !== 'string') {
+			return json({ error: 'User ID is required' }, { status: 400 });
 		}
 
 		// Generate unique session code
@@ -23,7 +27,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		} while (await PostgresSessionStore.getSession(sessionCode));
 
-		const session = await PostgresSessionStore.createSession(sessionCode, hostName);
+		const session = await PostgresSessionStore.createSession(sessionCode, hostName, userId);
 
 		return json({
 			sessionCode: session.sessionCode,

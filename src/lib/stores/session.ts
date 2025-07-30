@@ -6,6 +6,7 @@ export interface Participant {
 	isObserver?: boolean;
 	lastSeen?: number;
 	isConnected?: boolean;
+	userId?: string;
 }
 
 export interface SessionState {
@@ -32,6 +33,7 @@ export interface RecentSession {
 	sessionTitle?: string;
 	isHost: boolean;
 	lastAccessed: number;
+	userId: string;
 }
 
 export const defaultStoryPointScales = {
@@ -79,6 +81,31 @@ export function generateSessionCode(): string {
 	return code;
 }
 
+// User identifier management
+const USER_ID_KEY = 'userId';
+
+export function generateUserId(): string {
+	// Generate a unique user identifier (UUID-like)
+	return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+export function getUserId(): string {
+	if (typeof localStorage === 'undefined') return generateUserId();
+	
+	let userId = localStorage.getItem(USER_ID_KEY);
+	if (!userId) {
+		userId = generateUserId();
+		localStorage.setItem(USER_ID_KEY, userId);
+	}
+	return userId;
+}
+
+export function setUserId(userId: string): void {
+	if (typeof localStorage !== 'undefined') {
+		localStorage.setItem(USER_ID_KEY, userId);
+	}
+}
+
 // Recent sessions management
 const RECENT_SESSIONS_KEY = 'recentSessions';
 const MAX_RECENT_SESSIONS = 10;
@@ -98,9 +125,10 @@ export function getRecentSessions(): RecentSession[] {
 	}
 }
 
-export function addRecentSession(sessionData: Omit<RecentSession, 'lastAccessed'>): void {
+export function addRecentSession(sessionData: Omit<RecentSession, 'lastAccessed' | 'userId'>): void {
 	if (typeof localStorage === 'undefined') return;
 
+	const userId = getUserId();
 	const recentSessions = getRecentSessions();
 	const existingIndex = recentSessions.findIndex(
 		(s) => s.sessionCode === sessionData.sessionCode && s.playerName === sessionData.playerName
@@ -108,6 +136,7 @@ export function addRecentSession(sessionData: Omit<RecentSession, 'lastAccessed'
 
 	const sessionWithTimestamp: RecentSession = {
 		...sessionData,
+		userId,
 		lastAccessed: Date.now()
 	};
 
@@ -163,6 +192,7 @@ export function updateRecentSessionTitle(
 export function migrateOldSessionData(): void {
 	if (typeof localStorage === 'undefined') return;
 
+	// Migrate old format sessions
 	const sessionCode = localStorage.getItem('sessionCode');
 	const playerName = localStorage.getItem('playerName');
 	const isHost = localStorage.getItem('isHost') === 'true';
@@ -188,6 +218,30 @@ export function migrateOldSessionData(): void {
 		localStorage.removeItem('sessionCode');
 		localStorage.removeItem('playerName');
 		localStorage.removeItem('isHost');
+	}
+
+	// Migrate existing recent sessions to add userId if missing
+	const stored = localStorage.getItem(RECENT_SESSIONS_KEY);
+	if (stored) {
+		try {
+			const sessions: any[] = JSON.parse(stored);
+			let needsUpdate = false;
+			const currentUserId = getUserId();
+
+			const updatedSessions = sessions.map(session => {
+				if (!session.userId) {
+					needsUpdate = true;
+					return { ...session, userId: currentUserId };
+				}
+				return session;
+			});
+
+			if (needsUpdate) {
+				localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(updatedSessions));
+			}
+		} catch (error) {
+			console.error('[Migration] Error migrating recent sessions:', error);
+		}
 	}
 }
 
