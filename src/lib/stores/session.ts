@@ -143,21 +143,34 @@ export function mergeSessionsFromDatabase(databaseSessions: RecentSession[]): Re
 
 	const localSessions = getRecentSessions();
 	const mergedSessions = new Map<string, RecentSession>();
+	const databaseSessionKeys = new Set<string>();
 
-	// Add database sessions first
+	// Add database sessions first and track their keys
 	databaseSessions.forEach((session) => {
 		const key = `${session.sessionCode}:${session.playerName}`;
+		databaseSessionKeys.add(key);
 		mergedSessions.set(key, session);
 	});
 
-	// Add local sessions, but don't overwrite database sessions with older data
+	// Add local sessions only if they exist in database or have newer lastAccessed
 	localSessions.forEach((localSession) => {
 		const key = `${localSession.sessionCode}:${localSession.playerName}`;
 		const existing = mergedSessions.get(key);
 
-		if (!existing || existing.lastAccessed < localSession.lastAccessed) {
+		// Only keep local session if:
+		// 1. It exists in database AND has newer lastAccessed, OR
+		// 2. It doesn't exist in database but was accessed very recently (within last hour)
+		//    to handle cases where database fetch failed or session was just created
+		const recentlyAccessed = Date.now() - localSession.lastAccessed < 60 * 60 * 1000; // 1 hour
+
+		if (existing && existing.lastAccessed < localSession.lastAccessed) {
+			// Update with newer local data
+			mergedSessions.set(key, localSession);
+		} else if (!databaseSessionKeys.has(key) && recentlyAccessed) {
+			// Keep recently accessed sessions even if not in database
 			mergedSessions.set(key, localSession);
 		}
+		// Otherwise, don't include the local session (it was deleted or is stale)
 	});
 
 	// Convert back to array and sort
