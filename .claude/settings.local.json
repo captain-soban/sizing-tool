@@ -47,7 +47,14 @@
       "Bash(pkill:*)",
       "Bash(ls:*)",
       "Bash(timeout 5 npm run dev)",
-      "WebFetch(domain:lucide.dev)"
+      "WebFetch(domain:lucide.dev)",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(npm run:*)",
+      "Bash(set PGUSER=sizingtool)",
+      "Bash(set PGPASSWORD=sizing)",
+      "Bash(PGPASSWORD=\"sizing\" psql -U sizingtool -d planning_poker -h localhost)",
+      "Bash(PGPASSWORD=\"sizing\" psql -U sizingtool -d planning_poker -h localhost -c \"\\dt\")",
+      "Bash(PGPASSWORD:*)"
     ],
     "deny": []
   }

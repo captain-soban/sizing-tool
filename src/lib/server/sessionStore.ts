@@ -35,7 +35,10 @@ export class ServerSessionStore {
 				votingInProgress: false,
 				votesRevealed: false,
 				voteAverage: '',
-				finalEstimate: ''
+				finalEstimate: '',
+				currentRound: 1,
+				currentRoundDescription: 'Round 1',
+				rounds: []
 			},
 			storyPointScale: ['0', '1', '2', '3', '5', '8', '?'],
 			createdAt: new Date(),
@@ -179,6 +182,7 @@ export class ServerSessionStore {
 		}));
 
 		session.votingState = {
+			...session.votingState,
 			votingInProgress: true,
 			votesRevealed: false,
 			voteAverage: '',

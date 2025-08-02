@@ -51,6 +51,8 @@ export async function initDatabase() {
 				votes_revealed BOOLEAN NOT NULL DEFAULT FALSE,
 				vote_average VARCHAR(10) DEFAULT '',
 				final_estimate VARCHAR(10) DEFAULT '',
+				current_round INTEGER NOT NULL DEFAULT 1,
+				current_round_description VARCHAR(255) NOT NULL DEFAULT 'Round 1',
 				story_point_scale JSONB NOT NULL DEFAULT '["0","1","2","3","5","8","?"]',
 				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 				updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -80,6 +82,54 @@ export async function initDatabase() {
 			ADD COLUMN IF NOT EXISTS user_id VARCHAR(50)
 		`);
 
+		// Add current_round columns if they don't exist (for existing installations)
+		await pool.query(`
+			ALTER TABLE sessions 
+			ADD COLUMN IF NOT EXISTS current_round INTEGER NOT NULL DEFAULT 1,
+			ADD COLUMN IF NOT EXISTS current_round_description VARCHAR(255) NOT NULL DEFAULT 'Round 1'
+		`);
+
+		// Create voting_rounds table
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS voting_rounds (
+				id SERIAL PRIMARY KEY,
+				session_code VARCHAR(8) NOT NULL REFERENCES sessions(session_code) ON DELETE CASCADE,
+				round_number INTEGER NOT NULL,
+				description TEXT NOT NULL DEFAULT '',
+				vote_average VARCHAR(10) DEFAULT '',
+				final_estimate VARCHAR(10) DEFAULT '',
+				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				completed_at TIMESTAMP WITH TIME ZONE,
+				UNIQUE(session_code, round_number)
+			)
+		`);
+
+		// Create round_votes table to track individual votes per round
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS round_votes (
+				id SERIAL PRIMARY KEY,
+				round_id INTEGER NOT NULL REFERENCES voting_rounds(id) ON DELETE CASCADE,
+				participant_name VARCHAR(100) NOT NULL,
+				vote VARCHAR(10) NOT NULL,
+				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				UNIQUE(round_id, participant_name)
+			)
+		`);
+
+		// Create participant_sessions table to track which sessions a participant has joined
+		await pool.query(`
+			CREATE TABLE IF NOT EXISTS participant_sessions (
+				id SERIAL PRIMARY KEY,
+				user_id VARCHAR(50) NOT NULL,
+				session_code VARCHAR(8) NOT NULL REFERENCES sessions(session_code) ON DELETE CASCADE,
+				participant_name VARCHAR(100) NOT NULL,
+				is_host BOOLEAN NOT NULL DEFAULT FALSE,
+				first_joined TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				UNIQUE(user_id, session_code, participant_name)
+			)
+		`);
+
 		// Create indexes for better performance
 		await pool.query(`
 			CREATE INDEX IF NOT EXISTS idx_participants_session_code ON participants(session_code);
@@ -92,6 +142,18 @@ export async function initDatabase() {
 		`);
 		await pool.query(`
 			CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at);
+		`);
+		await pool.query(`
+			CREATE INDEX IF NOT EXISTS idx_voting_rounds_session_code ON voting_rounds(session_code);
+		`);
+		await pool.query(`
+			CREATE INDEX IF NOT EXISTS idx_round_votes_round_id ON round_votes(round_id);
+		`);
+		await pool.query(`
+			CREATE INDEX IF NOT EXISTS idx_participant_sessions_user_id ON participant_sessions(user_id);
+		`);
+		await pool.query(`
+			CREATE INDEX IF NOT EXISTS idx_participant_sessions_session_code ON participant_sessions(session_code);
 		`);
 
 		// Create function to update updated_at timestamp

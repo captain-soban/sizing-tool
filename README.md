@@ -264,25 +264,146 @@ This application can be deployed to various platforms with automatic database se
 
 #### 🚀 Vercel (Recommended)
 
-1. **Push to GitHub**
-   ```bash
-   git add . && git commit -m "Ready for deployment"
-   git push origin main
-   ```
+**Prerequisites:**
+- GitHub account with your repository
+- Vercel account (free tier available)
 
-2. **Deploy to Vercel**
-   - Connect your GitHub repository to [Vercel](https://vercel.com)
-   - Add PostgreSQL database:
-     - Go to Storage tab → Browse → Postgres → Create
-     - Copy the connection string
+**Step 1: Prepare Your Code**
+```bash
+# Ensure latest changes are committed and pushed
+git add .
+git commit -m "Ready for Vercel deployment"
+git push origin main
+```
 
-3. **Set Environment Variables**
-   ```bash
-   DATABASE_URL=postgresql://user:password@host:port/database
-   NODE_ENV=production
-   ```
+**Step 2: Deploy to Vercel**
 
-4. **Deploy** - Vercel automatically builds and deploys your app
+*Option A: GitHub Integration (Recommended)*
+1. Go to [vercel.com](https://vercel.com) and sign in
+2. Click "New Project"
+3. Import your GitHub repository: `captain-soban/sizing-tool`
+4. Vercel auto-detects SvelteKit configuration
+5. Click "Deploy" (first deployment will fail without database - this is expected)
+
+*Option B: Vercel CLI*
+```bash
+# Install Vercel CLI globally
+npm install -g vercel
+
+# Login to your account
+vercel login
+
+# Deploy from your project directory
+vercel --prod
+```
+
+**Step 3: Set Up Database**
+
+*Option A: Vercel Postgres (Recommended)*
+1. In your Vercel project dashboard, go to **Storage** tab
+2. Click **Browse** → **Postgres** → **Create**
+3. Choose a database name (e.g., `planning-poker-db`)
+4. Select region closest to your users
+5. Copy the `POSTGRES_URL` connection string
+
+*Option B: Neon (Free Tier)*
+1. Sign up at [neon.tech](https://neon.tech)
+2. Create new project: "Planning Poker"
+3. Copy connection string from dashboard
+4. Connection string format: `postgresql://user:password@host/dbname?sslmode=require`
+
+*Option C: Supabase (Free Tier)*
+1. Sign up at [supabase.com](https://supabase.com)
+2. Create new project: "Planning Poker"
+3. Go to Settings → Database
+4. Copy connection string (use "Session mode" for better compatibility)
+
+**Step 4: Configure Environment Variables**
+1. In Vercel dashboard, go to your project
+2. Navigate to **Settings** → **Environment Variables**
+3. Add the following variables:
+
+```bash
+# Required
+DATABASE_URL=your_postgres_connection_string_here
+NODE_ENV=production
+
+# Optional (for custom database configuration)
+DB_POOL_MAX=10
+DB_IDLE_TIMEOUT=30000
+DB_CONNECTION_TIMEOUT=2000
+```
+
+**Example DATABASE_URL formats:**
+```bash
+# Vercel Postgres
+DATABASE_URL=postgresql://user:password@host:5432/vercel-postgres-db
+
+# Neon
+DATABASE_URL=postgresql://user:password@ep-hostname.us-east-1.aws.neon.tech/neondb?sslmode=require
+
+# Supabase
+DATABASE_URL=postgresql://postgres.project-ref:password@aws-0-region.pooler.supabase.com:6543/postgres
+```
+
+**Step 5: Redeploy with Database**
+1. Go to **Deployments** tab in Vercel dashboard
+2. Click **Redeploy** on the latest deployment
+3. Or push a new commit to trigger auto-deployment
+
+**Step 6: Verify Deployment**
+1. Visit your Vercel deployment URL (e.g., `https://sizing-tool.vercel.app`)
+2. Create a test session to verify database connectivity
+3. Check that real-time features work correctly
+
+**Vercel Configuration Details:**
+
+Your project includes `vercel.json` with optimized settings:
+```json
+{
+  "functions": {
+    "src/routes/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cleanup",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
+```
+
+**Production Features:**
+- ✅ Automatic HTTPS
+- ✅ CDN edge locations worldwide
+- ✅ Automatic scaling
+- ✅ Database cleanup cron job (every 6 hours)
+- ✅ API route timeouts (30 seconds)
+- ✅ Real-time updates via Server-Sent Events
+
+**Troubleshooting Vercel Deployment:**
+
+*Database Connection Issues:*
+- Ensure `DATABASE_URL` is set correctly in Environment Variables
+- Verify database allows connections from Vercel's IP ranges
+- Check that SSL is properly configured (most cloud databases require it)
+
+*Build Failures:*
+- Check build logs in Vercel dashboard
+- Ensure all dependencies are in `package.json`
+- Verify TypeScript types are correct
+
+*Function Timeouts:*
+- API routes timeout after 30 seconds (configured in `vercel.json`)
+- For hobby plans, functions timeout after 10 seconds by default
+- Upgrade to Pro plan for longer timeouts if needed
+
+*Environment Variables Not Working:*
+- Redeploy after adding environment variables
+- Check variable names match exactly (case-sensitive)
+- Verify values don't contain special characters that need escaping
 
 #### 🚂 Railway
 

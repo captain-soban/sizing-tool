@@ -20,11 +20,23 @@ export interface SessionState {
 	storyPointScale: string[];
 }
 
+export interface VotingRound {
+	roundNumber: number;
+	description: string;
+	votes: { [participantName: string]: string };
+	voteAverage: string;
+	finalEstimate: string;
+	timestamp: number;
+}
+
 export interface VotingState {
 	votingInProgress: boolean;
 	votesRevealed: boolean;
 	voteAverage: string;
 	finalEstimate: string;
+	currentRound: number;
+	currentRoundDescription: string;
+	rounds: VotingRound[];
 }
 
 export interface RecentSession {
@@ -41,7 +53,8 @@ export const defaultStoryPointScales = {
 	fibonacci_1_8: ['1', '2', '3', '5', '8', '?'],
 	fibonacci_0_13: ['0', '1', '2', '3', '5', '8', '13', '?'],
 	tshirt: ['XS', 'S', 'M', 'L', 'XL', '?'],
-	linear: ['1', '2', '3', '4', '5', '6', '7', '8', '?']
+	linear: ['1', '2', '3', '4', '5', '6', '7', '8', '?'],
+	man_days: ['man_days']
 };
 
 export function createLocalStore<T>(key: string, initialValue: T) {
@@ -123,6 +136,39 @@ export function getRecentSessions(): RecentSession[] {
 	} catch {
 		return [];
 	}
+}
+
+export function mergeSessionsFromDatabase(databaseSessions: RecentSession[]): RecentSession[] {
+	if (typeof localStorage === 'undefined') return databaseSessions;
+
+	const localSessions = getRecentSessions();
+	const mergedSessions = new Map<string, RecentSession>();
+
+	// Add database sessions first
+	databaseSessions.forEach((session) => {
+		const key = `${session.sessionCode}:${session.playerName}`;
+		mergedSessions.set(key, session);
+	});
+
+	// Add local sessions, but don't overwrite database sessions with older data
+	localSessions.forEach((localSession) => {
+		const key = `${localSession.sessionCode}:${localSession.playerName}`;
+		const existing = mergedSessions.get(key);
+
+		if (!existing || existing.lastAccessed < localSession.lastAccessed) {
+			mergedSessions.set(key, localSession);
+		}
+	});
+
+	// Convert back to array and sort
+	const mergedArray = Array.from(mergedSessions.values())
+		.sort((a, b) => b.lastAccessed - a.lastAccessed)
+		.slice(0, MAX_RECENT_SESSIONS);
+
+	// Save merged sessions to localStorage
+	localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(mergedArray));
+
+	return mergedArray;
 }
 
 export function addRecentSession(
@@ -377,7 +423,10 @@ export class SharedSessionStore {
 					votingInProgress: false,
 					votesRevealed: false,
 					voteAverage: '',
-					finalEstimate: ''
+					finalEstimate: '',
+					currentRound: 1,
+					currentRoundDescription: 'Round 1',
+					rounds: []
 				};
 	}
 
