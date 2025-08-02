@@ -75,14 +75,16 @@
 	<div
 		class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4"
 		onclick={handleBackdropClick}
+		onkeydown={(e) => e.key === 'Escape' && handleBackdropClick(e as unknown as MouseEvent)}
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="modal-title"
+		tabindex="-1"
 	>
 		<!-- Modal content -->
 		<div
 			class="max-h-screen w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl"
-			onclick={(e) => e.stopPropagation()}
+			role="document"
 		>
 			<Card class="border-0 shadow-none">
 				<CardHeader class="pb-4">
@@ -154,7 +156,7 @@
 
 					<!-- Scale preview -->
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-gray-600">Preview</label>
+						<span class="text-sm font-medium text-gray-600">Preview</span>
 						<div class="flex flex-wrap gap-2">
 							{#each currentScale as point (point)}
 								<span

@@ -55,16 +55,15 @@
 	<!-- Modal Backdrop -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-		onclick={onClose}
+		onclick={(e) => e.target === e.currentTarget && onClose()}
+		onkeydown={(e) => e.key === 'Escape' && onClose()}
 		role="dialog"
 		aria-labelledby="new-round-title"
 		aria-modal="true"
+		tabindex="-1"
 	>
 		<!-- Modal Content -->
-		<div
-			class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
-			onclick={(e) => e.stopPropagation()}
-		>
+		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" role="document">
 			<div class="mb-4">
 				<h2 id="new-round-title" class="text-lg font-semibold text-gray-900">Start New Round</h2>
 				<p class="mt-1 text-sm text-gray-600">Enter a description for the next voting round</p>

@@ -8,15 +8,38 @@
 	import NewRoundModal from '$lib/components/NewRoundModal.svelte';
 	import ShareableLinkModal from '$lib/components/ShareableLinkModal.svelte';
 	import RoundsDrawer from '$lib/components/RoundsDrawer.svelte';
+	import ParticipantModeToggle from '$lib/components/ParticipantModeToggle.svelte';
+	import ParticipantStats from '$lib/components/ParticipantStats.svelte';
+	// import ObserverNotice from '$lib/components/ObserverNotice.svelte';
 	import { RoundService } from '$lib/services/roundService';
 	import { ShareableLinkService } from '$lib/services/shareableLinkService';
+	import {
+		ParticipantModeService,
+		type ParticipantModeState
+	} from '$lib/services/participantModeService';
 	import {
 		type Participant,
 		type VotingRound,
 		updateRecentSessionTitle
 	} from '$lib/stores/session';
 	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
-	import { BrainCog, Share2, Eye, Vote } from '@lucide/svelte';
+	import {
+		BrainCog,
+		Share2,
+		Eye,
+		Vote,
+		Settings,
+		LogOut,
+		Plus,
+		BarChart3,
+		RotateCcw,
+		Check,
+		Edit3,
+		Theater,
+		Rocket,
+		Lightbulb,
+		CheckCircle
+	} from '@lucide/svelte';
 
 	const sessionCode = $page.params.sessionCode!;
 
@@ -49,13 +72,33 @@
 	let shareableLinkError = $state('');
 	let isJoiningViaLink = $state(false);
 	let roundService: RoundService;
+	let participantModeService: ParticipantModeService;
 	let shareableLinkService: ShareableLinkService;
+
+	// Helper function to initialize participant mode service
+	function initializeParticipantModeService() {
+		if (!playerName) return; // Don't initialize without playerName
+
+		participantModeService = new ParticipantModeService(sessionClient, {
+			sessionCode,
+			playerName,
+			onStateUpdate: (state) => {
+				isHost = state.isHost;
+				isObserver = state.isObserver;
+			},
+			onVoteReset: () => {
+				selectedVote = null;
+				manDaysInput = '';
+			}
+		});
+	}
 
 	onMount(() => {
 		// Initialize services first
 		sessionClient = new SessionClient();
 		shareableLinkService = new ShareableLinkService(sessionClient);
 		roundService = new RoundService(sessionClient);
+		// participantModeService will be initialized later when playerName is set
 
 		// Check shareable link access - async but not blocking the main onMount return
 		(async () => {
@@ -80,6 +123,7 @@
 				if (linkResult.playerName) {
 					playerName = linkResult.playerName;
 					isHost = linkResult.isHost || false;
+					initializeParticipantModeService(); // Initialize service now that we have playerName
 
 					await shareableLinkService.rejoinViaShareableLink(sessionCode, playerName, isHost);
 					await initializeSession();
@@ -152,9 +196,7 @@
 
 	async function initializeSession() {
 		// Load observer status from localStorage (user preference)
-		const storedIsObserver =
-			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
-		isObserver = storedIsObserver;
+		isObserver = participantModeService.loadObserverPreference();
 
 		// Services are already initialized in onMount
 
@@ -221,21 +263,39 @@
 		isManDaysMode = storyPointOptions.length === 1 && storyPointOptions[0] === 'man_days';
 		console.log('[SessionData] Man days mode:', isManDaysMode, 'Options:', storyPointOptions);
 
-		// Update local selected vote based on participant data
+		// Update local selected vote and participant mode based on participant data
 		const currentParticipant = participants.find((p) => p.name === playerName);
-		if (currentParticipant && currentParticipant.vote !== selectedVote) {
-			selectedVote = currentParticipant.vote || null;
-			console.log('[SessionData] Updated selectedVote to:', selectedVote);
+		if (currentParticipant) {
+			if (currentParticipant.vote !== selectedVote) {
+				selectedVote = currentParticipant.vote || null;
+				console.log('[SessionData] Updated selectedVote to:', selectedVote);
+			}
+
+			// Update participant mode state (host and observer status)
+			const currentState: ParticipantModeState = {
+				isObserver,
+				isHost,
+				playerName,
+				sessionCode
+			};
+
+			const updatedState = participantModeService.updateFromParticipant(
+				currentState,
+				currentParticipant
+			);
+			if (updatedState) {
+				console.log('[SessionData] Updated participant mode:', updatedState);
+			}
 		}
 
 		// Update recent session title if it changed
 		updateRecentSessionTitle(sessionCode, playerName, sessionData.title);
 	}
 
-	function saveSessionState() {
-		// Save individual session settings (not shared)
-		localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
-	}
+	// function saveSessionState() {
+	// 	// Save individual session settings (not shared)
+	// 	localStorage.setItem(`session_${sessionCode}_observer_${playerName}`, isObserver.toString());
+	// }
 
 	async function copySessionLink() {
 		await ShareableLinkService.copyShareableLink(sessionCode, '[title="Share session"]');
@@ -251,6 +311,7 @@
 			// Set local state
 			playerName = joinPlayerName;
 			isHost = false;
+			initializeParticipantModeService(); // Initialize service now that we have playerName
 			showShareableLinkModal = false;
 
 			// Setup session without double-joining (service already joined)
@@ -265,9 +326,7 @@
 
 	async function setupSessionAfterJoin() {
 		// Load observer status from localStorage (user preference)
-		const storedIsObserver =
-			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
-		isObserver = storedIsObserver;
+		isObserver = participantModeService.loadObserverPreference();
 
 		// Set up real-time updates
 		sessionClient.onUpdate((sessionData: SessionData) => {
@@ -308,27 +367,26 @@
 	// Old shared link functions removed - now using ShareableLinkService and ShareableLinkModal
 
 	async function toggleObserverMode() {
-		isObserver = !isObserver;
-
-		// Update server state
-		if (sessionClient) {
-			try {
-				const updates: Partial<Participant> = { isObserver };
-				// Clear vote if becoming observer
-				if (isObserver) {
-					updates.voted = false;
-					updates.vote = undefined;
-					selectedVote = null;
-				}
-				await sessionClient.updateParticipant(sessionCode, playerName, updates);
-			} catch (error) {
-				console.error('[Session] Error toggling observer mode:', error);
-				// Revert the change if API call failed
-				isObserver = !isObserver;
-			}
+		// Ensure service is initialized before using it
+		if (!participantModeService) {
+			console.error('[Session] ParticipantModeService not initialized');
+			return;
 		}
 
-		saveSessionState();
+		const currentState: ParticipantModeState = {
+			isObserver,
+			isHost,
+			playerName,
+			sessionCode
+		};
+
+		try {
+			await participantModeService.toggleObserverMode(currentState);
+			// State will be updated via the onStateUpdate callback
+		} catch (error) {
+			console.error('[Session] Error toggling observer mode:', error);
+			// State remains unchanged on error
+		}
 	}
 
 	function exitSession() {
@@ -432,39 +490,40 @@
 			throw new Error('Invalid state for starting new round');
 		}
 
-		// Check if there's a current round that needs to be saved
-		const shouldSaveCurrentRound = votesRevealed && voteAverage;
-
 		isStartingNewRound = true;
 		try {
-			if (shouldSaveCurrentRound) {
-				// Complete current round and start new one
-				const { completedRound, newRoundNumber } = await roundService.transitionToNewRound(
+			// Complete current round if there are votes
+			if (voteAverage) {
+				const completedRound = await roundService.completeCurrentRound(
 					sessionCode,
 					currentRound,
 					currentRoundDescription,
 					participants,
 					voteAverage,
-					finalEstimate || voteAverage,
-					description
+					finalEstimate || voteAverage
 				);
-
-				// Update local state
 				rounds = [...rounds, completedRound];
-				currentRound = newRoundNumber;
-				currentRoundDescription = description;
+			}
 
-				console.log(`[Rounds] Successfully transitioned to round ${newRoundNumber}`);
+			// Start new round
+			const newRoundNumber = currentRound + 1;
+			await roundService.startNewRound(sessionCode, newRoundNumber, description);
+
+			// Refresh session data after round operations
+			const updatedSession = await sessionClient.getSession(sessionCode);
+			if (updatedSession) {
+				updateFromSessionData(updatedSession);
+			}
+
+			console.log(`[Rounds] Successfully started round ${newRoundNumber}`);
+			if (voteAverage) {
+				console.log(
+					`[Rounds] Completed previous round ${currentRound} with average: ${voteAverage}`
+				);
 			} else {
-				// Just start a new round without saving current (no voting happened)
-				const newRoundNumber = currentRound + 1;
-				await roundService.startNewRound(sessionCode, newRoundNumber, description);
-
-				// Update local state
-				currentRound = newRoundNumber;
-				currentRoundDescription = description;
-
-				console.log(`[Rounds] Started new round ${newRoundNumber} without saving previous`);
+				console.log(
+					`[Rounds] Started new round ${newRoundNumber} without completing previous round`
+				);
 			}
 
 			// Reset voting state
@@ -588,8 +647,7 @@
 
 	// Check if all non-observer participants have voted
 	function allParticipantsVoted(): boolean {
-		const votingParticipants = participants.filter((p) => !p.isObserver);
-		return votingParticipants.length > 0 && votingParticipants.every((p) => p.voted);
+		return ParticipantModeService.allVotingParticipantsHaveVoted(participants);
 	}
 </script>
 
@@ -644,9 +702,7 @@
 								title="Click to edit title"
 							>
 								{sessionTitle}
-								<span class="ml-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
-									>✏️</span
-								>
+								<Edit3 class="ml-1 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
 							</button>
 						{:else}
 							<h1 class="text-lg font-bold text-blue-700 sm:text-xl lg:text-2xl">
@@ -666,30 +722,13 @@
 				</div>
 			{/if}
 			<p class="mt-1 text-xs text-gray-600">Session: {sessionCode}</p>
-			<p class="text-xs text-gray-500">
-				👥 {participants.length} participant{participants.length !== 1 ? 's' : ''}
-				{#if participants.filter((p) => !p.isObserver).length !== participants.length}
-					({participants.filter((p) => !p.isObserver).length} voting)
-				{/if}
-			</p>
+			<ParticipantStats {participants} class="text-xs text-gray-500" />
 		</div>
 	</div>
 
 	<!-- Top Controls -->
 	<div class="fixed top-4 right-4 z-10 flex gap-2">
-		<Button
-			variant="outline"
-			onclick={toggleObserverMode}
-			class={isObserver
-				? 'border-orange-300 bg-orange-100 text-orange-800 hover:bg-orange-200'
-				: 'border-green-300 bg-green-100 text-green-800 hover:bg-green-200'}
-		>
-			{#if isObserver}
-				<Eye class="mr-1 h-4 w-4" /> Observer
-			{:else}
-				<Vote class="mr-1 h-4 w-4" /> Participant
-			{/if}
-		</Button>
+		<ParticipantModeToggle {isObserver} onToggle={toggleObserverMode} />
 		{#if isHost}
 			<Button
 				variant="outline"
@@ -697,7 +736,8 @@
 				class="btn-poker-gray"
 				title="Start new voting round"
 			>
-				➕ New Round
+				<Plus class="mr-1 h-4 w-4" />
+				New Round
 			</Button>
 		{/if}
 		{#if rounds.length > 0}
@@ -707,11 +747,23 @@
 				class="btn-poker-gray"
 				title="View rounds history"
 			>
-				📊 ({rounds.length})
+				<BarChart3 class="mr-1 h-4 w-4" />
+				({rounds.length})
 			</Button>
 		{/if}
-		<Button variant="outline" size="icon" onclick={goToSettings} class="btn-poker-gray">⚙️</Button>
-		<Button variant="outline" onclick={exitSession} class="btn-poker-gray">Exit</Button>
+		<Button
+			variant="outline"
+			size="icon"
+			onclick={goToSettings}
+			class="btn-poker-gray"
+			title="Settings"
+		>
+			<Settings class="h-4 w-4" />
+		</Button>
+		<Button variant="outline" onclick={exitSession} class="btn-poker-gray" title="Exit session">
+			<LogOut class="mr-1 h-4 w-4" />
+			Exit
+		</Button>
 	</div>
 
 	<!-- Main Poker Table -->
@@ -751,7 +803,8 @@
 														class="bg-green-500 px-3 text-xs text-white hover:bg-green-600 sm:px-4 sm:text-sm"
 														size="sm"
 													>
-														✓ Accept {voteAverage}
+														<Check class="mr-1 h-3 w-3" />
+														Accept {voteAverage}
 													</Button>
 												</div>
 												<div class="flex flex-wrap justify-center gap-1 sm:gap-2">
@@ -761,7 +814,8 @@
 														size="sm"
 														class="btn-poker-gray text-xs sm:text-sm"
 													>
-														🔄 Re-vote
+														<RotateCcw class="mr-1 h-3 w-3" />
+														Re-vote
 													</Button>
 													<Button
 														onclick={async () => {
@@ -781,7 +835,8 @@
 														size="sm"
 														class="btn-poker-gray text-xs sm:text-sm"
 													>
-														✏️ Custom
+														<Edit3 class="mr-1 h-3 w-3" />
+														Custom
 													</Button>
 												</div>
 											</div>
@@ -820,12 +875,15 @@
 									</div>
 								{:else if votingInProgress}
 									<div class="space-y-3">
-										<p class="text-muted-foreground">🗳️ Voting in progress...</p>
-										<div class="text-sm text-gray-600">
-											{participants.filter((p) => !p.isObserver && p.voted).length} / {participants.filter(
-												(p) => !p.isObserver
-											).length} votes cast
+										<div class="flex items-center justify-center gap-2">
+											<Vote class="h-5 w-5 text-blue-600" />
+											<p class="text-muted-foreground">Voting in progress...</p>
 										</div>
+										<ParticipantStats
+											{participants}
+											showVotingProgress={true}
+											class="text-sm text-gray-600"
+										/>
 										{#if isHost}
 											<div class="flex flex-wrap justify-center gap-2">
 												<Button
@@ -835,7 +893,8 @@
 														? 'bg-poker-red hover:bg-poker-red/90'
 														: 'cursor-not-allowed bg-gray-400'}
 												>
-													🎭 Reveal Votes
+													<Theater class="mr-1 h-4 w-4" />
+													Reveal Votes
 												</Button>
 												<Button
 													onclick={startNewVoting}
@@ -843,7 +902,8 @@
 													size="sm"
 													class="btn-poker-gray text-xs sm:text-sm"
 												>
-													🔄 Restart
+													<RotateCcw class="mr-1 h-3 w-3" />
+													Restart
 												</Button>
 											</div>
 										{/if}
@@ -853,7 +913,8 @@
 										<p class="text-muted-foreground">Ready to start voting</p>
 										{#if isHost}
 											<Button onclick={startNewVoting} class="bg-poker-blue hover:bg-poker-blue/90">
-												🚀 Start Voting
+												<Rocket class="mr-1 h-4 w-4" />
+												Start Voting
 											</Button>
 										{:else}
 											<p class="text-sm text-gray-500">Waiting for host to start...</p>
@@ -891,9 +952,10 @@
 											{/if}
 											{#if participant.isObserver}
 												<span
-													class="rounded bg-orange-200 px-1 py-0.5 text-[8px] font-medium text-orange-800 sm:text-[9px]"
-													>👁️</span
+													class="flex items-center rounded bg-orange-200 px-1 py-0.5 text-[8px] font-medium text-orange-800 sm:text-[9px]"
 												>
+													<Eye class="h-2 w-2" />
+												</span>
 											{/if}
 										</div>
 									</div>
@@ -902,9 +964,10 @@
 									<div class="flex justify-center">
 										{#if participant.isObserver}
 											<div
-												class="rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-medium text-orange-600 sm:px-2 sm:py-1 sm:text-[10px]"
+												class="flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-medium text-orange-600 sm:px-2 sm:py-1 sm:text-[10px]"
 											>
-												👁️ Observer
+												<Eye class="h-3 w-3" />
+												Observer
 											</div>
 										{:else if votesRevealed && participant.vote}
 											<div
@@ -914,9 +977,10 @@
 											</div>
 										{:else if participant.voted}
 											<div
-												class="bounce-in rounded bg-green-500 px-1.5 py-0.5 text-[9px] font-medium text-white sm:px-2 sm:py-1 sm:text-[10px]"
+												class="bounce-in flex items-center gap-1 rounded bg-green-500 px-1.5 py-0.5 text-[9px] font-medium text-white sm:px-2 sm:py-1 sm:text-[10px]"
 											>
-												✓ Voted
+												<CheckCircle class="h-3 w-3" />
+												Voted
 											</div>
 										{:else if votingInProgress}
 											<div
@@ -953,9 +1017,12 @@
 				<CardContent class="p-2 sm:p-3">
 					{#if isManDaysMode}
 						<p class="mb-1 text-center text-xs font-medium sm:text-sm">Enter estimated man days:</p>
-						<p class="mb-2 text-center text-[10px] text-gray-500 sm:text-xs">
-							💡 Enter number of workdays (decimals allowed: 1, 2.5, 0.5)
-						</p>
+						<div class="mb-2 flex items-center justify-center gap-1">
+							<Lightbulb class="h-3 w-3 text-yellow-500" />
+							<p class="text-center text-[10px] text-gray-500 sm:text-xs">
+								Enter number of workdays (decimals allowed: 1, 2.5, 0.5)
+							</p>
+						</div>
 
 						<div class="flex gap-2">
 							<Input
@@ -982,9 +1049,10 @@
 
 						{#if selectedVote}
 							<div class="mt-2 text-center">
-								<p class="text-xs text-green-600">
-									✓ Voted: {selectedVote} day{parseFloat(selectedVote) !== 1 ? 's' : ''}
-								</p>
+								<div class="flex items-center justify-center gap-1 text-xs text-green-600">
+									<CheckCircle class="h-3 w-3" />
+									<p>Voted: {selectedVote} day{parseFloat(selectedVote) !== 1 ? 's' : ''}</p>
+								</div>
 								<Button
 									onclick={() => {
 										selectedVote = null;
@@ -1000,9 +1068,12 @@
 						{/if}
 					{:else}
 						<p class="mb-1 text-center text-xs font-medium sm:text-sm">Choose your estimate:</p>
-						<p class="mb-2 text-center text-[10px] text-gray-500 sm:text-xs">
-							💡 Press 0-8 or ? to vote quickly
-						</p>
+						<div class="mb-2 flex items-center justify-center gap-1">
+							<Lightbulb class="h-3 w-3 text-yellow-500" />
+							<p class="text-center text-[10px] text-gray-500 sm:text-xs">
+								Press 0-8 or ? to vote quickly
+							</p>
+						</div>
 						<div class="flex flex-wrap justify-center {getButtonGap()}">
 							{#each storyPointOptions as option (option)}
 								<Button
@@ -1027,9 +1098,12 @@
 		>
 			<Card class="work-area">
 				<CardContent class="p-4 sm:p-6">
-					<p class="text-center text-sm text-orange-600 sm:text-base">
-						👁️ You are observing this session. Toggle to participant mode to vote.
-					</p>
+					<div
+						class="flex items-center justify-center gap-2 text-center text-sm text-orange-600 sm:text-base"
+					>
+						<Eye class="h-5 w-5" />
+						<p>You are observing this session. Toggle to participant mode to vote.</p>
+					</div>
 				</CardContent>
 			</Card>
 		</div>

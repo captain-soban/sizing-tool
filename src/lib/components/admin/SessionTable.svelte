@@ -100,7 +100,7 @@
 			</div>
 		{:else}
 			<div class="overflow-hidden">
-				<table class="min-w-full divide-y divide-gray-200" role="table">
+				<table class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50">
 						<tr>
 							<th

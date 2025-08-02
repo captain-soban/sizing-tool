@@ -138,26 +138,41 @@ export function getRecentSessions(): RecentSession[] {
 	}
 }
 
-export function mergeSessionsFromDatabase(databaseSessions: RecentSession[]): RecentSession[] {
+export function mergeSessionsFromDatabase(
+	databaseSessions: RecentSession[],
+	forceSync = false
+): RecentSession[] {
 	if (typeof localStorage === 'undefined') return databaseSessions;
 
 	const localSessions = getRecentSessions();
 	const mergedSessions = new Map<string, RecentSession>();
+	const databaseSessionKeys = new Set<string>();
 
-	// Add database sessions first
+	// Add database sessions first and track their keys
 	databaseSessions.forEach((session) => {
 		const key = `${session.sessionCode}:${session.playerName}`;
+		databaseSessionKeys.add(key);
 		mergedSessions.set(key, session);
 	});
 
-	// Add local sessions, but don't overwrite database sessions with older data
+	// Add local sessions only if they exist in database or have newer lastAccessed
 	localSessions.forEach((localSession) => {
 		const key = `${localSession.sessionCode}:${localSession.playerName}`;
 		const existing = mergedSessions.get(key);
 
-		if (!existing || existing.lastAccessed < localSession.lastAccessed) {
+		// Only keep local session if it exists in database AND has newer lastAccessed
+		if (existing && existing.lastAccessed < localSession.lastAccessed) {
+			// Update with newer local data
 			mergedSessions.set(key, localSession);
+		} else if (!forceSync && !databaseSessionKeys.has(key)) {
+			// Keep recently accessed sessions if not forcing sync (within last hour)
+			// This handles cases where database fetch failed or session was just created
+			const recentlyAccessed = Date.now() - localSession.lastAccessed < 60 * 60 * 1000; // 1 hour
+			if (recentlyAccessed) {
+				mergedSessions.set(key, localSession);
+			}
 		}
+		// If forceSync is true, only keep sessions that exist in database
 	});
 
 	// Convert back to array and sort
@@ -169,6 +184,11 @@ export function mergeSessionsFromDatabase(databaseSessions: RecentSession[]): Re
 	localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(mergedArray));
 
 	return mergedArray;
+}
+
+export function forceSyncSessionsFromDatabase(databaseSessions: RecentSession[]): RecentSession[] {
+	// Force sync mode - removes any local sessions not in database
+	return mergeSessionsFromDatabase(databaseSessions, true);
 }
 
 export function addRecentSession(

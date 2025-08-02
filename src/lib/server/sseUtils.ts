@@ -29,9 +29,18 @@ export async function broadcastSessionUpdate(sessionCode: string) {
 
 	connections.forEach((controller) => {
 		try {
-			controller.enqueue(`data: ${data}\n\n`);
+			// Check if controller is still writable before trying to enqueue
+			if (controller.desiredSize !== null) {
+				controller.enqueue(`data: ${data}\n\n`);
+			} else {
+				// Controller is closed, mark for removal
+				deadConnections.add(controller);
+			}
 		} catch (error) {
-			console.log(`[SSE] Failed to send update to ${sessionCode}:`, error);
+			console.log(
+				`[SSE] Failed to send update to ${sessionCode}:`,
+				error instanceof Error ? error.message : String(error)
+			);
 			deadConnections.add(controller);
 		}
 	});
@@ -45,5 +54,10 @@ export async function broadcastSessionUpdate(sessionCode: string) {
 		sessionConnections.delete(sessionCode);
 	}
 
-	console.log(`[SSE] Broadcasted update to ${connections.size} clients in session ${sessionCode}`);
+	const activeConnections = connections.size;
+	if (activeConnections > 0) {
+		console.log(
+			`[SSE] Broadcasted update to ${activeConnections} clients in session ${sessionCode}`
+		);
+	}
 }

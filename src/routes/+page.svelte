@@ -11,6 +11,7 @@
 		getRecentSessions,
 		migrateOldSessionData,
 		mergeSessionsFromDatabase,
+		forceSyncSessionsFromDatabase,
 		type RecentSession
 	} from '$lib/stores/session';
 
@@ -24,19 +25,47 @@
 
 	const sessionClient = new SessionClient();
 
-	onMount(async () => {
-		// Migrate old localStorage data if it exists
-		migrateOldSessionData();
-
+	async function refreshSessions(forceSync = false) {
 		try {
 			// Fetch user sessions from database and merge with local storage
 			const databaseSessions = await sessionClient.getUserSessions();
-			recentSessions = mergeSessionsFromDatabase(databaseSessions);
+			recentSessions = forceSync
+				? forceSyncSessionsFromDatabase(databaseSessions)
+				: mergeSessionsFromDatabase(databaseSessions);
 		} catch (error) {
 			console.error('[Landing] Error fetching user sessions from database:', error);
-			// Fallback to local sessions only
-			recentSessions = getRecentSessions();
+			// Fallback to local sessions only if not forcing sync
+			if (!forceSync) {
+				recentSessions = getRecentSessions();
+			}
 		}
+	}
+
+	onMount(() => {
+		// Migrate old localStorage data if it exists
+		migrateOldSessionData();
+
+		// Initial load with normal merge
+		refreshSessions();
+
+		// Set up periodic force sync to catch admin deletions
+		const syncInterval = setInterval(() => {
+			refreshSessions(true);
+		}, 30000); // Force sync every 30 seconds
+
+		// Force sync when page becomes visible (user returns to tab)
+		function handleVisibilityChange() {
+			if (!document.hidden) {
+				refreshSessions(true);
+			}
+		}
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		// Cleanup on unmount
+		return () => {
+			clearInterval(syncInterval);
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
 	});
 
 	function handleCreateSessionClick() {

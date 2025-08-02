@@ -51,12 +51,14 @@
 		aria-modal="true"
 		aria-labelledby="modal-title"
 		onkeydown={handleKeydown}
+		tabindex="-1"
 	>
 		<div class="flex min-h-screen items-center justify-center p-4">
 			<button
 				type="button"
 				class="bg-opacity-50 fixed inset-0 bg-black"
 				onclick={handleBackdropClick}
+				onkeydown={(e) => e.key === 'Escape' && handleBackdropClick(e as unknown as MouseEvent)}
 				aria-label="Close modal"
 			></button>
 			<div class="relative w-full max-w-2xl">
@@ -111,7 +113,7 @@
 							</h4>
 							{#if session.participants && session.participants.length > 0}
 								<div class="overflow-hidden rounded-lg border">
-									<table class="min-w-full divide-y divide-gray-200" role="table">
+									<table class="min-w-full divide-y divide-gray-200">
 										<thead class="bg-gray-50">
 											<tr>
 												<th
