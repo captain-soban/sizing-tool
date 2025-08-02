@@ -8,12 +8,13 @@
 		show: boolean;
 		playerName: string;
 		onCancel: () => void;
-		onConfirm: (title: string, scale: string[]) => void;
+		onConfirm: (title: string, scale: string[], roundDescription: string) => void;
 	}
 
 	let { show = $bindable(), playerName, onCancel, onConfirm }: Props = $props();
 
 	let sessionTitle = $state('');
+	let roundDescription = $state('');
 	let selectedScale = $state('fibonacci_0_8');
 
 	// Generate scale options from the same source as settings
@@ -38,14 +39,18 @@
 	);
 
 	function handleSubmit() {
-		if (!sessionTitle.trim()) return;
-		onConfirm(sessionTitle.trim(), currentScale);
+		// Use default values if fields are empty
+		const finalSessionTitle = sessionTitle.trim() || 'Session 1';
+		const finalRoundDescription = roundDescription.trim() || 'Round 1';
+
+		onConfirm(finalSessionTitle, currentScale, finalRoundDescription);
 		handleClose();
 	}
 
 	function handleClose() {
 		show = false;
 		sessionTitle = '';
+		roundDescription = '';
 		selectedScale = 'fibonacci_0_8';
 		onCancel();
 	}
@@ -106,14 +111,32 @@
 
 				<CardContent class="space-y-6">
 					<div class="space-y-2">
-						<label for="modal-sessionTitle" class="text-sm font-medium">Session Title</label>
+						<label for="modal-sessionTitle" class="text-sm font-medium">
+							Session Title <span class="text-xs text-gray-500">(optional)</span>
+						</label>
 						<Input
 							id="modal-sessionTitle"
 							type="text"
 							bind:value={sessionTitle}
-							placeholder="e.g. Sprint Planning, Epic Review"
+							placeholder="Session 1 (default)"
 							autofocus
 						/>
+						<p class="text-xs text-gray-500">Leave blank to use "Session 1"</p>
+					</div>
+
+					<div class="space-y-2">
+						<label for="modal-roundDescription" class="text-sm font-medium">
+							First Round Description <span class="text-xs text-gray-500">(optional)</span>
+						</label>
+						<Input
+							id="modal-roundDescription"
+							type="text"
+							bind:value={roundDescription}
+							placeholder="Round 1 (default)"
+						/>
+						<p class="text-xs text-gray-500">
+							Describe what you'll be estimating (e.g. "User Authentication", "Payment System")
+						</p>
 					</div>
 
 					<div class="space-y-2">
@@ -145,11 +168,7 @@
 
 					<div class="flex gap-3 pt-4">
 						<Button onclick={handleClose} variant="outline" class="flex-1">Cancel</Button>
-						<Button
-							onclick={handleSubmit}
-							disabled={!sessionTitle.trim()}
-							class="bg-poker-blue hover:bg-poker-blue/90 flex-1"
-						>
+						<Button onclick={handleSubmit} class="bg-poker-blue hover:bg-poker-blue/90 flex-1">
 							Create Session
 						</Button>
 					</div>

@@ -12,6 +12,70 @@ export interface ServerSession {
 }
 
 export class PostgresSessionStore {
+	/**
+	 * Load voting rounds for a session
+	 */
+	static async loadRoundsForSession(
+		sessionCode: string
+	): Promise<import('$lib/stores/session').VotingRound[]> {
+		const pool = getPool();
+		try {
+			// Get all rounds for the session
+			const roundsResult = await pool.query(
+				`
+				SELECT 
+					vr.id,
+					vr.round_number,
+					vr.description,
+					vr.vote_average,
+					vr.final_estimate,
+					vr.created_at,
+					vr.completed_at
+				FROM voting_rounds vr
+				WHERE vr.session_code = $1
+				ORDER BY vr.round_number ASC
+			`,
+				[sessionCode]
+			);
+
+			const rounds = [];
+
+			for (const round of roundsResult.rows) {
+				// Get votes for this round
+				const votesResult = await pool.query(
+					`
+					SELECT participant_name, vote
+					FROM round_votes
+					WHERE round_id = $1
+					ORDER BY participant_name ASC
+				`,
+					[round.id]
+				);
+
+				const votes: { [key: string]: string } = {};
+				votesResult.rows.forEach((row) => {
+					votes[row.participant_name] = row.vote;
+				});
+
+				rounds.push({
+					roundNumber: round.round_number,
+					description: round.description,
+					votes,
+					voteAverage: round.vote_average || '',
+					finalEstimate: round.final_estimate || '',
+					timestamp: new Date(round.created_at).getTime()
+				});
+			}
+
+			return rounds;
+		} catch (error) {
+			console.error(
+				`[PostgresSessionStore] Error loading rounds for session ${sessionCode}:`,
+				error
+			);
+			return []; // Return empty array on error
+		}
+	}
 	static async createSession(
 		sessionCode: string,
 		hostName: string,
@@ -62,7 +126,8 @@ export class PostgresSessionStore {
 			// Get session data
 			const sessionResult = await pool.query(
 				`SELECT session_code, title, voting_in_progress, votes_revealed, 
-						vote_average, final_estimate, story_point_scale, created_at, updated_at
+						vote_average, final_estimate, current_round, current_round_description,
+						story_point_scale, created_at, updated_at
 				 FROM sessions WHERE session_code = $1`,
 				[sessionCode]
 			);
@@ -93,6 +158,9 @@ export class PostgresSessionStore {
 				userId: row.user_id
 			}));
 
+			// Load rounds for this session
+			const rounds = await this.loadRoundsForSession(sessionCode);
+
 			const session: ServerSession = {
 				sessionCode: sessionRow.session_code,
 				title: sessionRow.title,
@@ -101,7 +169,10 @@ export class PostgresSessionStore {
 					votingInProgress: sessionRow.voting_in_progress,
 					votesRevealed: sessionRow.votes_revealed,
 					voteAverage: sessionRow.vote_average || '',
-					finalEstimate: sessionRow.final_estimate || ''
+					finalEstimate: sessionRow.final_estimate || '',
+					currentRound: sessionRow.current_round || 1,
+					currentRoundDescription: sessionRow.current_round_description || 'Round 1',
+					rounds: rounds
 				},
 				storyPointScale: sessionRow.story_point_scale,
 				createdAt: sessionRow.created_at,
@@ -248,7 +319,7 @@ export class PostgresSessionStore {
 
 		try {
 			const setClauses: string[] = [];
-			const values: (boolean | string)[] = [];
+			const values: (boolean | string | number)[] = [];
 			let paramCount = 1;
 
 			// Build dynamic update query
@@ -267,6 +338,14 @@ export class PostgresSessionStore {
 			if (votingState.finalEstimate !== undefined) {
 				setClauses.push(`final_estimate = $${paramCount++}`);
 				values.push(votingState.finalEstimate);
+			}
+			if (votingState.currentRound !== undefined) {
+				setClauses.push(`current_round = $${paramCount++}`);
+				values.push(votingState.currentRound);
+			}
+			if (votingState.currentRoundDescription !== undefined) {
+				setClauses.push(`current_round_description = $${paramCount++}`);
+				values.push(votingState.currentRoundDescription);
 			}
 
 			if (setClauses.length === 0) {
@@ -399,6 +478,9 @@ export class PostgresSessionStore {
 					[sessionRow.session_code]
 				);
 
+				// Load rounds for this session
+				const rounds = await this.loadRoundsForSession(sessionRow.session_code);
+
 				const session: ServerSession = {
 					sessionCode: sessionRow.session_code,
 					title: sessionRow.title,
@@ -414,7 +496,10 @@ export class PostgresSessionStore {
 						votingInProgress: sessionRow.voting_in_progress,
 						votesRevealed: sessionRow.votes_revealed,
 						voteAverage: sessionRow.vote_average || '',
-						finalEstimate: sessionRow.final_estimate || ''
+						finalEstimate: sessionRow.final_estimate || '',
+						currentRound: sessionRow.current_round || 1,
+						currentRoundDescription: sessionRow.current_round_description || 'Round 1',
+						rounds: rounds
 					},
 					storyPointScale: sessionRow.story_point_scale || ['0', '1', '2', '3', '5', '8', '?'],
 					createdAt: sessionRow.created_at,
@@ -438,10 +523,11 @@ export class PostgresSessionStore {
 		try {
 			await pool.query('BEGIN');
 
-			// Delete participants first (foreign key constraint)
-			await pool.query('DELETE FROM participants WHERE session_code = $1', [sessionCode]);
-
-			// Delete session
+			// Delete session - this will cascade to delete:
+			// - participants (via ON DELETE CASCADE)
+			// - voting_rounds (via ON DELETE CASCADE)
+			// - round_votes (via voting_rounds CASCADE)
+			// - participant_sessions (via ON DELETE CASCADE)
 			const result = await pool.query('DELETE FROM sessions WHERE session_code = $1', [
 				sessionCode
 			]);
@@ -450,7 +536,9 @@ export class PostgresSessionStore {
 
 			const deleted = (result.rowCount ?? 0) > 0;
 			if (deleted) {
-				console.log(`[PostgresSessionStore] Deleted session ${sessionCode}`);
+				console.log(
+					`[PostgresSessionStore] Deleted session ${sessionCode} and all associated data (participants, voting rounds, votes)`
+				);
 			} else {
 				console.log(`[PostgresSessionStore] Session ${sessionCode} not found for deletion`);
 			}

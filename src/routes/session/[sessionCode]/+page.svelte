@@ -3,12 +3,16 @@
 	import { goto } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader } from '$lib/components/ui/card';
+	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Input } from '$lib/components/ui/input';
+	import NewRoundModal from '$lib/components/NewRoundModal.svelte';
+	import ShareableLinkModal from '$lib/components/ShareableLinkModal.svelte';
+	import RoundsDrawer from '$lib/components/RoundsDrawer.svelte';
+	import { RoundService } from '$lib/services/roundService';
+	import { ShareableLinkService } from '$lib/services/shareableLinkService';
 	import {
 		type Participant,
-		getRecentSessions,
-		addRecentSession,
+		type VotingRound,
 		updateRecentSessionTitle
 	} from '$lib/stores/session';
 	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
@@ -30,36 +34,62 @@
 	let tempTitle = $state('');
 	let sessionClient: SessionClient;
 	let heartbeatInterval: number | null = null;
-	let showNamePrompt = $state(false);
-	let tempPlayerName = $state('');
+	// Removed old name prompt state - now using ShareableLinkModal
 
 	let storyPointOptions = $state<string[]>(['0', '1', '2', '3', '5', '8', '?']);
+	let isManDaysMode = $state(false);
+	let manDaysInput = $state('');
+	let currentRound = $state(1);
+	let currentRoundDescription = $state('Round 1');
+	let rounds = $state<VotingRound[]>([]);
+	let showRoundsDrawer = $state(false);
+	let showNewRoundModal = $state(false);
+	let isStartingNewRound = $state(false);
+	let showShareableLinkModal = $state(false);
+	let shareableLinkError = $state('');
+	let isJoiningViaLink = $state(false);
+	let roundService: RoundService;
+	let shareableLinkService: ShareableLinkService;
 
 	onMount(() => {
-		// Try to find the session in recent sessions
-		const recentSessions = getRecentSessions();
-		const currentSession = recentSessions.find((s) => s.sessionCode === sessionCode);
+		// Initialize services first
+		sessionClient = new SessionClient();
+		shareableLinkService = new ShareableLinkService(sessionClient);
+		roundService = new RoundService(sessionClient);
 
-		if (!currentSession) {
-			// This is a shared link access - user hasn't joined this session before
-			console.log('[Session] New user accessing shared link, prompting for name');
-			showNamePrompt = true;
-			return;
-		}
+		// Check shareable link access - async but not blocking the main onMount return
+		(async () => {
+			try {
+				const linkResult = await shareableLinkService.checkShareableLinkAccess(sessionCode);
 
-		playerName = currentSession.playerName;
-		isHost = currentSession.isHost;
+				if (!linkResult.sessionExists) {
+					// Session doesn't exist - redirect to home
+					console.log('[Session] Session not found, redirecting to home');
+					goto('/');
+					return;
+				}
 
-		// Update the session's last accessed time
-		addRecentSession({
-			sessionCode: currentSession.sessionCode,
-			playerName: currentSession.playerName,
-			isHost: currentSession.isHost,
-			sessionTitle: currentSession.sessionTitle
-		});
+				if (linkResult.needsNamePrompt) {
+					// New user accessing shared link - show name prompt
+					console.log('[Session] New user accessing shared link, showing name modal');
+					showShareableLinkModal = true;
+					return;
+				}
 
-		// Continue with session initialization
-		initializeSession();
+				// Returning user - set info and rejoin
+				if (linkResult.playerName) {
+					playerName = linkResult.playerName;
+					isHost = linkResult.isHost || false;
+
+					await shareableLinkService.rejoinViaShareableLink(sessionCode, playerName, isHost);
+					await initializeSession();
+				}
+			} catch (error) {
+				console.error('[Session] Error with shareable link access:', error);
+				goto('/');
+				return;
+			}
+		})();
 
 		// Handle visibility changes to reconnect when user returns to tab
 		const handleVisibilityChange = () => {
@@ -126,8 +156,7 @@
 			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
 		isObserver = storedIsObserver;
 
-		// Initialize session client
-		sessionClient = new SessionClient();
+		// Services are already initialized in onMount
 
 		// Set up real-time updates
 		sessionClient.onUpdate((sessionData: SessionData) => {
@@ -138,6 +167,14 @@
 			// Join or rejoin the session
 			const sessionData = await sessionClient.joinSession(sessionCode, playerName, isObserver);
 			updateFromSessionData(sessionData);
+
+			// Track participant joining this session
+			await sessionClient.trackParticipant(sessionCode, playerName, isHost);
+
+			// Load existing rounds from database
+			const existingRounds = await sessionClient.getRounds(sessionCode);
+			rounds = existingRounds;
+			// Note: currentRound and currentRoundDescription will be set by updateFromSessionData
 
 			// Connect to real-time updates
 			sessionClient.connectToRealtime(sessionCode);
@@ -155,6 +192,8 @@
 	}
 
 	function updateFromSessionData(sessionData: SessionData) {
+		console.log('[SessionData] Received update:', sessionData);
+
 		sessionTitle = sessionData.title;
 		participants = sessionData.participants;
 		votingInProgress = sessionData.votingState.votingInProgress;
@@ -162,9 +201,31 @@
 		voteAverage = sessionData.votingState.voteAverage;
 		finalEstimate = sessionData.votingState.finalEstimate;
 
+		// Update rounds data if available
+		if (sessionData.votingState.currentRound) {
+			currentRound = sessionData.votingState.currentRound;
+		}
+		if (sessionData.votingState.currentRoundDescription) {
+			currentRoundDescription = sessionData.votingState.currentRoundDescription;
+		}
+		if (sessionData.votingState.rounds) {
+			rounds = sessionData.votingState.rounds;
+		}
+
 		// Update story point options if different
 		if (JSON.stringify(sessionData.storyPointScale) !== JSON.stringify(storyPointOptions)) {
 			storyPointOptions = sessionData.storyPointScale;
+		}
+
+		// Check if we're in man days mode
+		isManDaysMode = storyPointOptions.length === 1 && storyPointOptions[0] === 'man_days';
+		console.log('[SessionData] Man days mode:', isManDaysMode, 'Options:', storyPointOptions);
+
+		// Update local selected vote based on participant data
+		const currentParticipant = participants.find((p) => p.name === playerName);
+		if (currentParticipant && currentParticipant.vote !== selectedVote) {
+			selectedVote = currentParticipant.vote || null;
+			console.log('[SessionData] Updated selectedVote to:', selectedVote);
 		}
 
 		// Update recent session title if it changed
@@ -177,59 +238,74 @@
 	}
 
 	async function copySessionLink() {
+		await ShareableLinkService.copyShareableLink(sessionCode, '[title="Share session"]');
+	}
+
+	async function handleShareableLinkJoin(joinPlayerName: string) {
+		shareableLinkError = '';
+		isJoiningViaLink = true;
+
 		try {
-			const sessionUrl = `${window.location.origin}/session/${sessionCode}`;
-			await navigator.clipboard.writeText(sessionUrl);
-			// Simple visual feedback - could be enhanced with a toast notification
-			const button = document.querySelector('[title="Share session"]');
-			if (button) {
-				const originalTitle = button.getAttribute('title');
-				button.setAttribute('title', 'Copied to clipboard!');
-				setTimeout(() => {
-					button.setAttribute('title', originalTitle || 'Share session');
-				}, 2000);
-			}
-		} catch (err) {
-			console.error('Failed to copy session link:', err);
-			// Fallback for browsers that don't support clipboard API
-			alert(`Share this session code: ${sessionCode}`);
+			await shareableLinkService.joinViaShareableLink(sessionCode, joinPlayerName);
+
+			// Set local state
+			playerName = joinPlayerName;
+			isHost = false;
+			showShareableLinkModal = false;
+
+			// Setup session without double-joining (service already joined)
+			await setupSessionAfterJoin();
+		} catch (error) {
+			console.error('[Session] Error joining via shareable link:', error);
+			shareableLinkError = error instanceof Error ? error.message : 'Failed to join session';
+		} finally {
+			isJoiningViaLink = false;
 		}
 	}
 
-	async function handleNameSubmit() {
-		if (!tempPlayerName.trim()) return;
+	async function setupSessionAfterJoin() {
+		// Load observer status from localStorage (user preference)
+		const storedIsObserver =
+			localStorage.getItem(`session_${sessionCode}_observer_${playerName}`) === 'true';
+		isObserver = storedIsObserver;
+
+		// Set up real-time updates
+		sessionClient.onUpdate((sessionData: SessionData) => {
+			updateFromSessionData(sessionData);
+		});
 
 		try {
-			// Join the session with the provided name
-			const client = new SessionClient();
-			await client.joinSession(sessionCode, tempPlayerName.trim());
+			// Get current session data (don't join again, already joined via service)
+			const sessionData = await sessionClient.getSession(sessionCode);
+			if (sessionData) {
+				updateFromSessionData(sessionData);
+			}
 
-			// Set the player name and continue with normal flow
-			playerName = tempPlayerName.trim();
-			isHost = false; // Shared link users are never hosts
-			showNamePrompt = false;
+			// Load existing rounds from database
+			const existingRounds = await sessionClient.getRounds(sessionCode);
+			rounds = existingRounds;
 
-			// Add to recent sessions for future use
-			addRecentSession({
-				sessionCode: sessionCode,
-				playerName: playerName,
-				isHost: false,
-				sessionTitle: undefined // Will be updated when session data loads
-			});
+			// Connect to real-time updates
+			sessionClient.connectToRealtime(sessionCode);
 
-			// Continue with normal session initialization
-			initializeSession();
-		} catch (err) {
-			console.error('[Session] Error joining session via shared link:', err);
-			// If session doesn't exist or there's an error, redirect to home
+			// Start heartbeat to show this participant is active
+			heartbeatInterval = window.setInterval(() => {
+				if (sessionClient) {
+					sessionClient.sendHeartbeat(sessionCode, playerName);
+				}
+			}, 5000); // Send heartbeat every 5 seconds
+		} catch (error) {
+			console.error('[Session] Error setting up session after join:', error);
 			goto('/');
 		}
 	}
 
-	function handleNameCancel() {
-		// User cancelled name entry, redirect to home
+	function handleShareableLinkCancel() {
+		showShareableLinkModal = false;
 		goto('/');
 	}
+
+	// Old shared link functions removed - now using ShareableLinkService and ShareableLinkModal
 
 	async function toggleObserverMode() {
 		isObserver = !isObserver;
@@ -282,11 +358,22 @@
 		}
 	}
 
+	function submitManDaysVote() {
+		if (isObserver || !manDaysInput) return;
+
+		const numValue = parseFloat(manDaysInput);
+		if (isNaN(numValue) || numValue < 0) return;
+
+		const vote = numValue.toString();
+		selectVote(vote);
+	}
+
 	async function startNewVoting() {
 		if (!isHost) return;
 
 		// Clear local UI state
 		selectedVote = null;
+		manDaysInput = '';
 
 		// Reset votes on server
 		if (sessionClient) {
@@ -337,6 +424,57 @@
 			} catch (error) {
 				console.error('[Session] Error accepting estimate:', error);
 			}
+		}
+	}
+
+	async function handleNewRound(description: string) {
+		if (!isHost || !description.trim()) {
+			throw new Error('Invalid state for starting new round');
+		}
+
+		// Check if there's a current round that needs to be saved
+		const shouldSaveCurrentRound = votesRevealed && voteAverage;
+
+		isStartingNewRound = true;
+		try {
+			if (shouldSaveCurrentRound) {
+				// Complete current round and start new one
+				const { completedRound, newRoundNumber } = await roundService.transitionToNewRound(
+					sessionCode,
+					currentRound,
+					currentRoundDescription,
+					participants,
+					voteAverage,
+					finalEstimate || voteAverage,
+					description
+				);
+
+				// Update local state
+				rounds = [...rounds, completedRound];
+				currentRound = newRoundNumber;
+				currentRoundDescription = description;
+
+				console.log(`[Rounds] Successfully transitioned to round ${newRoundNumber}`);
+			} else {
+				// Just start a new round without saving current (no voting happened)
+				const newRoundNumber = currentRound + 1;
+				await roundService.startNewRound(sessionCode, newRoundNumber, description);
+
+				// Update local state
+				currentRound = newRoundNumber;
+				currentRoundDescription = description;
+
+				console.log(`[Rounds] Started new round ${newRoundNumber} without saving previous`);
+			}
+
+			// Reset voting state
+			selectedVote = null;
+			manDaysInput = '';
+		} catch (error) {
+			console.error('[Session] Error starting new round:', error);
+			throw error; // Re-throw to let modal handle the error
+		} finally {
+			isStartingNewRound = false;
 		}
 	}
 
@@ -456,7 +594,7 @@
 </script>
 
 <div class="min-h-screen p-4">
-	<!-- Session Title - Upper Left -->
+	<!-- Session Info - Upper Left -->
 	<div class="fixed top-4 left-4 z-10">
 		<div class="rounded-lg border bg-white/90 px-3 py-2 shadow-lg backdrop-blur-sm">
 			{#if editingTitle}
@@ -464,7 +602,7 @@
 					<input
 						type="text"
 						bind:value={tempTitle}
-						class="w-full rounded border p-1 text-sm font-bold text-blue-700 sm:text-base lg:text-lg"
+						class="w-full rounded border p-1 text-lg font-bold text-blue-700 sm:text-xl lg:text-2xl"
 						placeholder="Enter session title"
 						onkeydown={(e) => {
 							if (e.key === 'Enter') saveTitle();
@@ -495,7 +633,7 @@
 						{#if isHost}
 							<button
 								type="button"
-								class="m-0 cursor-pointer rounded border-none bg-transparent p-0 text-left text-sm font-bold text-blue-700 transition-colors hover:text-blue-700/80 focus:text-blue-700/80 focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:outline-none sm:text-base lg:text-lg"
+								class="m-0 cursor-pointer rounded border-none bg-transparent p-0 text-left text-lg font-bold text-blue-700 transition-colors hover:text-blue-700/80 focus:text-blue-700/80 focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 focus:outline-none sm:text-xl lg:text-2xl"
 								onclick={startEditingTitle}
 								onkeydown={(e) => {
 									if (e.key === 'Enter' || e.key === ' ') {
@@ -511,7 +649,7 @@
 								>
 							</button>
 						{:else}
-							<h1 class="text-sm font-bold text-blue-700 sm:text-base lg:text-lg">
+							<h1 class="text-lg font-bold text-blue-700 sm:text-xl lg:text-2xl">
 								{sessionTitle}
 							</h1>
 						{/if}
@@ -527,7 +665,7 @@
 					</Button>
 				</div>
 			{/if}
-			<p class="text-xs text-gray-600">Session: {sessionCode}</p>
+			<p class="mt-1 text-xs text-gray-600">Session: {sessionCode}</p>
 			<p class="text-xs text-gray-500">
 				👥 {participants.length} participant{participants.length !== 1 ? 's' : ''}
 				{#if participants.filter((p) => !p.isObserver).length !== participants.length}
@@ -552,6 +690,26 @@
 				<Vote class="mr-1 h-4 w-4" /> Participant
 			{/if}
 		</Button>
+		{#if isHost}
+			<Button
+				variant="outline"
+				onclick={() => (showNewRoundModal = true)}
+				class="btn-poker-gray"
+				title="Start new voting round"
+			>
+				➕ New Round
+			</Button>
+		{/if}
+		{#if rounds.length > 0}
+			<Button
+				variant="outline"
+				onclick={() => (showRoundsDrawer = !showRoundsDrawer)}
+				class="btn-poker-gray"
+				title="View rounds history"
+			>
+				📊 ({rounds.length})
+			</Button>
+		{/if}
 		<Button variant="outline" size="icon" onclick={goToSettings} class="btn-poker-gray">⚙️</Button>
 		<Button variant="outline" onclick={exitSession} class="btn-poker-gray">Exit</Button>
 	</div>
@@ -570,22 +728,19 @@
 					<div class="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-3">
 						<Card class="work-area w-full max-w-[240px] text-center sm:max-w-[280px]">
 							<CardContent class="p-2.5 sm:p-3 lg:p-4">
-								<!-- Session Title -->
+								<!-- Round Info -->
 								<div class="mb-3 sm:mb-4">
-									<h2
-										class="text-lg leading-tight font-bold text-blue-700 sm:text-xl lg:text-2xl"
-										title="Session title"
-									>
-										{sessionTitle}
-									</h2>
+									<p class="text-sm font-medium text-gray-600">{currentRoundDescription}</p>
 								</div>
 
 								<!-- Voting Status and Results -->
 								{#if votesRevealed && voteAverage}
 									<div class="space-y-2 sm:space-y-3">
-										<p class="text-muted-foreground text-xs sm:text-sm">Team Average:</p>
+										<p class="text-muted-foreground text-xs sm:text-sm">
+											{isManDaysMode ? 'Average Days:' : 'Team Average:'}
+										</p>
 										<p class="text-poker-red bounce-in text-2xl font-bold sm:text-3xl lg:text-4xl">
-											{voteAverage}
+											{voteAverage}{isManDaysMode ? ' days' : ''}
 										</p>
 
 										{#if isHost && !finalEstimate}
@@ -635,7 +790,9 @@
 										{#if finalEstimate}
 											<div class="mt-4 rounded-md border-2 border-green-300 bg-green-100 p-3">
 												<p class="font-medium text-green-800">
-													Final Estimate: <span class="text-2xl font-bold">{finalEstimate}</span>
+													Final Estimate: <span class="text-2xl font-bold"
+														>{finalEstimate}{isManDaysMode ? ' days' : ''}</span
+													>
 												</p>
 												{#if isHost}
 													<Button
@@ -753,7 +910,7 @@
 											<div
 												class="bounce-in bg-poker-blue rounded px-2 py-0.5 text-xs font-bold text-white sm:px-2.5 sm:py-1 sm:text-sm"
 											>
-												{participant.vote}
+												{participant.vote}{isManDaysMode ? 'd' : ''}
 											</div>
 										{:else if participant.voted}
 											<div
@@ -788,25 +945,76 @@
 	<!-- Voting Cards (Bottom) -->
 	{#if votingInProgress && !votesRevealed && !isObserver}
 		<div
-			class="fixed bottom-4 left-1/2 w-full -translate-x-1/2 transform {getEstimationFrameWidth()} px-4 sm:bottom-6"
+			class="fixed bottom-4 left-1/2 w-full -translate-x-1/2 transform {isManDaysMode
+				? 'max-w-md'
+				: getEstimationFrameWidth()} px-4 sm:bottom-6"
 		>
 			<Card class="work-area">
 				<CardContent class="p-2 sm:p-3">
-					<p class="mb-1 text-center text-xs font-medium sm:text-sm">Choose your estimate:</p>
-					<p class="mb-2 text-center text-[10px] text-gray-500 sm:text-xs">
-						💡 Press 0-8 or ? to vote quickly
-					</p>
-					<div class="flex flex-wrap justify-center {getButtonGap()}">
-						{#each storyPointOptions as option (option)}
+					{#if isManDaysMode}
+						<p class="mb-1 text-center text-xs font-medium sm:text-sm">Enter estimated man days:</p>
+						<p class="mb-2 text-center text-[10px] text-gray-500 sm:text-xs">
+							💡 Enter number of workdays (decimals allowed: 1, 2.5, 0.5)
+						</p>
+
+						<div class="flex gap-2">
+							<Input
+								type="number"
+								step="0.1"
+								min="0"
+								bind:value={manDaysInput}
+								placeholder="e.g., 2.5"
+								class="flex-1"
+								onkeydown={(e) => {
+									if (e.key === 'Enter') {
+										submitManDaysVote();
+									}
+								}}
+							/>
 							<Button
-								onclick={() => selectVote(option)}
-								variant={selectedVote === option ? 'default' : 'outline'}
-								class={getButtonClasses(selectedVote === option)}
+								onclick={submitManDaysVote}
+								disabled={!manDaysInput || !!selectedVote}
+								class="bg-poker-blue hover:bg-poker-blue/90"
 							>
-								{option}
+								{selectedVote ? 'Voted' : 'Vote'}
 							</Button>
-						{/each}
-					</div>
+						</div>
+
+						{#if selectedVote}
+							<div class="mt-2 text-center">
+								<p class="text-xs text-green-600">
+									✓ Voted: {selectedVote} day{parseFloat(selectedVote) !== 1 ? 's' : ''}
+								</p>
+								<Button
+									onclick={() => {
+										selectedVote = null;
+										manDaysInput = '';
+									}}
+									variant="outline"
+									size="sm"
+									class="mt-1 text-xs"
+								>
+									Change Vote
+								</Button>
+							</div>
+						{/if}
+					{:else}
+						<p class="mb-1 text-center text-xs font-medium sm:text-sm">Choose your estimate:</p>
+						<p class="mb-2 text-center text-[10px] text-gray-500 sm:text-xs">
+							💡 Press 0-8 or ? to vote quickly
+						</p>
+						<div class="flex flex-wrap justify-center {getButtonGap()}">
+							{#each storyPointOptions as option (option)}
+								<Button
+									onclick={() => selectVote(option)}
+									variant={selectedVote === option ? 'default' : 'outline'}
+									class={getButtonClasses(selectedVote === option)}
+								>
+									{option}
+								</Button>
+							{/each}
+						</div>
+					{/if}
 				</CardContent>
 			</Card>
 		</div>
@@ -828,46 +1036,26 @@
 	{/if}
 </div>
 
-<!-- Name Prompt Modal for Shared Links -->
-{#if showNamePrompt}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-		<Card class="work-area w-full max-w-md">
-			<CardHeader>
-				<div class="flex justify-center">
-					<img src="/logo.svg" alt="Planning Poker Logo" class="h-12 w-auto" />
-				</div>
-				<h2 class="text-center text-lg font-semibold text-gray-900">Join Planning Session</h2>
-				<p class="text-center text-sm text-gray-600">
-					You've been invited to join session <strong>{sessionCode}</strong>
-				</p>
-			</CardHeader>
-			<CardContent class="space-y-4">
-				<div class="space-y-2">
-					<label for="sharedPlayerName" class="text-sm font-medium">Your Name</label>
-					<Input
-						id="sharedPlayerName"
-						type="text"
-						bind:value={tempPlayerName}
-						placeholder="Enter your name"
-						onkeydown={(e) => e.key === 'Enter' && handleNameSubmit()}
-					/>
-				</div>
-				<div class="flex space-x-3">
-					<Button
-						onclick={handleNameSubmit}
-						disabled={!tempPlayerName.trim()}
-						class="bg-poker-blue hover:bg-poker-blue/90 flex-1"
-					>
-						Join Session
-					</Button>
-					<Button variant="outline" onclick={handleNameCancel} class="btn-poker-gray flex-1">
-						Cancel
-					</Button>
-				</div>
-			</CardContent>
-		</Card>
-	</div>
-{/if}
+<RoundsDrawer show={showRoundsDrawer} {rounds} onClose={() => (showRoundsDrawer = false)} />
+
+<!-- Shareable Link Modal -->
+<ShareableLinkModal
+	isOpen={showShareableLinkModal}
+	{sessionCode}
+	{sessionTitle}
+	onJoin={handleShareableLinkJoin}
+	onCancel={handleShareableLinkCancel}
+	isLoading={isJoiningViaLink}
+	error={shareableLinkError}
+/>
+
+<!-- New Round Modal -->
+<NewRoundModal
+	isOpen={showNewRoundModal}
+	onClose={() => (showNewRoundModal = false)}
+	onConfirm={handleNewRound}
+	isLoading={isStartingNewRound}
+/>
 
 <style>
 	@keyframes pulse {

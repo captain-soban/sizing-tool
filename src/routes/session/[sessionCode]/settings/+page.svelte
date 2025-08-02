@@ -183,13 +183,17 @@
 								disabled={!isHost}
 							>
 								<div class="font-medium capitalize">
-									{key
-										.replace('-', ' ')
-										.replace('fibonacci', 'Fibonacci')
-										.replace('tshirt', 'T-Shirt')}
+									{key === 'man_days'
+										? 'Man Days'
+										: key
+												.replace('-', ' ')
+												.replace('fibonacci', 'Fibonacci')
+												.replace('tshirt', 'T-Shirt')}
 								</div>
 								<div class="text-muted-foreground text-sm">
-									{scale.join(', ')}
+									{key === 'man_days'
+										? 'Estimate in number of workdays (allows decimals)'
+										: scale.join(', ')}
 								</div>
 							</RadioGroupItem>
 						{/each}

@@ -1,4 +1,4 @@
-import type { Participant, VotingState } from '$lib/stores/session';
+import type { Participant, VotingState, VotingRound, RecentSession } from '$lib/stores/session';
 import { getUserId } from '$lib/stores/session';
 
 export interface SessionData {
@@ -219,5 +219,77 @@ export class SessionClient {
 		} catch (error) {
 			console.error('[SessionClient] Failed to send heartbeat:', error);
 		}
+	}
+
+	// Get voting rounds for a session
+	async getRounds(sessionCode: string): Promise<VotingRound[]> {
+		const response = await fetch(`/api/sessions/${sessionCode}/rounds`);
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to get rounds');
+		}
+
+		const data = await response.json();
+		return data.rounds;
+	}
+
+	// Save a voting round
+	async saveRound(
+		sessionCode: string,
+		roundNumber: number,
+		description: string,
+		votes: { [participantName: string]: string },
+		voteAverage: string,
+		finalEstimate: string
+	): Promise<void> {
+		const response = await fetch(`/api/sessions/${sessionCode}/rounds`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				roundNumber,
+				description,
+				votes,
+				voteAverage,
+				finalEstimate
+			})
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to save round');
+		}
+	}
+
+	// Track participant joining session
+	async trackParticipant(sessionCode: string, playerName: string, isHost: boolean): Promise<void> {
+		const userId = getUserId();
+		const response = await fetch(
+			`/api/sessions/${sessionCode}/participants/${encodeURIComponent(playerName)}/track`,
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ userId, isHost })
+			}
+		);
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to track participant');
+		}
+	}
+
+	// Get user's recent sessions from database
+	async getUserSessions(userId?: string): Promise<RecentSession[]> {
+		const userIdToUse = userId || getUserId();
+		const response = await fetch(`/api/sessions/user/${encodeURIComponent(userIdToUse)}`);
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to get user sessions');
+		}
+
+		const data = await response.json();
+		return data.sessions;
 	}
 }

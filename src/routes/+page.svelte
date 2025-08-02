@@ -10,6 +10,7 @@
 		addRecentSession,
 		getRecentSessions,
 		migrateOldSessionData,
+		mergeSessionsFromDatabase,
 		type RecentSession
 	} from '$lib/stores/session';
 
@@ -23,11 +24,19 @@
 
 	const sessionClient = new SessionClient();
 
-	onMount(() => {
+	onMount(async () => {
 		// Migrate old localStorage data if it exists
 		migrateOldSessionData();
-		// Load recent sessions
-		recentSessions = getRecentSessions();
+
+		try {
+			// Fetch user sessions from database and merge with local storage
+			const databaseSessions = await sessionClient.getUserSessions();
+			recentSessions = mergeSessionsFromDatabase(databaseSessions);
+		} catch (error) {
+			console.error('[Landing] Error fetching user sessions from database:', error);
+			// Fallback to local sessions only
+			recentSessions = getRecentSessions();
+		}
 	});
 
 	function handleCreateSessionClick() {
@@ -36,7 +45,7 @@
 	}
 
 	async function handleSessionSetup(title: string, scale: string[]) {
-		if (!playerName.trim() || !title.trim()) return;
+		if (!playerName.trim()) return;
 
 		isCreating = true;
 		error = '';
@@ -51,6 +60,9 @@
 				isHost: true,
 				sessionTitle: title
 			});
+
+			// TODO: In future, we could save the initial round description to the session
+			// For now, it will be used when the first voting round is completed
 
 			goto(`/session/${session.sessionCode}`);
 		} catch (err) {
