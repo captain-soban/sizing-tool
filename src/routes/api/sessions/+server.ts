@@ -11,7 +11,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		performLazyCleanup().catch((error) => {
 			console.error('[API] Lazy cleanup error:', error);
 		});
-		const { hostName, userId, title, storyPointScale } = await request.json();
+		const { hostName, userId, title, storyPointScale, roundDescription } = await request.json();
 
 		if (!hostName || typeof hostName !== 'string') {
 			return json({ error: 'Host name is required' }, { status: 400 });
@@ -37,7 +37,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			hostName,
 			userId,
 			title,
-			storyPointScale
+			storyPointScale,
+			roundDescription
 		);
 
 		return json({

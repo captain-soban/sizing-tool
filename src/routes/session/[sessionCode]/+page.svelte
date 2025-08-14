@@ -107,6 +107,23 @@
 		// Check shareable link access - async but not blocking the main onMount return
 		(async () => {
 			try {
+				// First check if user has recent session data (they may have just created this session)
+				const recentSessions = await import('$lib/stores/session').then((m) =>
+					m.getRecentSessions()
+				);
+				const existingSession = recentSessions.find((s) => s.sessionCode === sessionCode);
+
+				if (existingSession) {
+					// User has recent session data - use it directly
+					console.log('[Session] Found recent session data, using direct flow');
+					playerName = existingSession.playerName;
+					isHost = existingSession.isHost;
+					initializeParticipantModeService();
+					await initializeSession();
+					return;
+				}
+
+				// No recent session data - proceed with shareable link flow
 				const linkResult = await shareableLinkService.checkShareableLinkAccess(sessionCode);
 
 				if (!linkResult.sessionExists) {
@@ -143,7 +160,7 @@
 		const handleVisibilityChange = () => {
 			if (!document.hidden && sessionClient) {
 				// Reconnect to real-time updates if needed
-				sessionClient.connectToRealtime(sessionCode);
+				sessionClient.connectToRealtime(sessionCode, playerName);
 			}
 		};
 
@@ -223,14 +240,14 @@
 			// Note: currentRound and currentRoundDescription will be set by updateFromSessionData
 
 			// Connect to real-time updates
-			sessionClient.connectToRealtime(sessionCode);
+			sessionClient.connectToRealtime(sessionCode, playerName);
 
-			// Start heartbeat to show this participant is active
+			// Start lightweight heartbeat (reduced frequency since SSE provides real-time connection tracking)
 			heartbeatInterval = window.setInterval(() => {
 				if (sessionClient) {
 					sessionClient.sendHeartbeat(sessionCode, playerName);
 				}
-			}, 5000); // Send heartbeat every 5 seconds
+			}, 60000); // Send heartbeat every 60 seconds (reduced from 5 seconds)
 		} catch (error) {
 			console.error('[Session] Error joining session:', error);
 			goto('/');
@@ -359,14 +376,14 @@
 			rounds = existingRounds;
 
 			// Connect to real-time updates
-			sessionClient.connectToRealtime(sessionCode);
+			sessionClient.connectToRealtime(sessionCode, playerName);
 
-			// Start heartbeat to show this participant is active
+			// Start lightweight heartbeat (reduced frequency since SSE provides real-time connection tracking)
 			heartbeatInterval = window.setInterval(() => {
 				if (sessionClient) {
 					sessionClient.sendHeartbeat(sessionCode, playerName);
 				}
-			}, 5000); // Send heartbeat every 5 seconds
+			}, 60000); // Send heartbeat every 60 seconds (reduced from 5 seconds)
 		} catch (error) {
 			console.error('[Session] Error setting up session after join:', error);
 			goto('/');
@@ -460,9 +477,16 @@
 	async function revealVotes() {
 		if (!isHost) return;
 
-		// Calculate average from current participants
+		// Calculate average from current participants (exclude disconnected non-hosts)
 		const votes = participants
-			.filter((p) => !p.isObserver && p.vote && p.vote !== '?' && !isNaN(parseFloat(p.vote)))
+			.filter(
+				(p) =>
+					!p.isObserver &&
+					(p.isHost || p.isConnected !== false) &&
+					p.vote &&
+					p.vote !== '?' &&
+					!isNaN(parseFloat(p.vote))
+			)
 			.map((p) => parseFloat(p.vote!));
 
 		let calculatedAverage = '';
@@ -974,7 +998,12 @@
 					>
 						<div class="flex flex-col items-center">
 							<!-- Participant Card -->
-							<Card class="work-area relative w-24 sm:w-28">
+							<Card
+								class="work-area relative w-24 sm:w-28 {!participant.isHost &&
+								participant.isConnected === false
+									? 'bg-gray-50 opacity-75'
+									: ''}"
+							>
 								<CardContent class="p-1.5 text-center sm:p-2">
 									<!-- Host Remove Button (only show for host viewing other participants) -->
 									{#if isHost && participant.name !== playerName && !participant.isHost}
@@ -1007,12 +1036,26 @@
 													<Eye class="h-2 w-2" />
 												</span>
 											{/if}
+											{#if !participant.isHost && participant.isConnected === false}
+												<span
+													class="flex items-center rounded bg-gray-400 px-1 py-0.5 text-[8px] font-medium text-white sm:text-[9px]"
+													title="Disconnected"
+												>
+													⚫
+												</span>
+											{/if}
 										</div>
 									</div>
 
 									<!-- Vote Status Indicator -->
 									<div class="flex justify-center">
-										{#if participant.isObserver}
+										{#if !participant.isHost && participant.isConnected === false}
+											<div
+												class="flex items-center gap-1 rounded bg-gray-300 px-1.5 py-0.5 text-[9px] font-medium text-gray-700 sm:px-2 sm:py-1 sm:text-[10px]"
+											>
+												⚫ Offline
+											</div>
+										{:else if participant.isObserver}
 											<div
 												class="flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-medium text-orange-600 sm:px-2 sm:py-1 sm:text-[10px]"
 											>

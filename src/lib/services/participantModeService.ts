@@ -138,17 +138,18 @@ export class ParticipantModeService {
 	}
 
 	/**
-	 * Determines if participant can vote based on observer status
+	 * Determines if participant can vote based on observer status and connection
 	 */
 	static canParticipantVote(participant: Participant): boolean {
-		return !participant.isObserver;
+		return !participant.isObserver && (participant.isHost || participant.isConnected !== false);
 	}
 
 	/**
-	 * Filters participants to only voting participants (non-observers)
+	 * Filters participants to only voting participants (non-observers and connected)
+	 * Note: Hosts are always included regardless of connection status to maintain session control
 	 */
 	static getVotingParticipants(participants: Participant[]): Participant[] {
-		return participants.filter((p) => !p.isObserver);
+		return participants.filter((p) => !p.isObserver && (p.isHost || p.isConnected !== false));
 	}
 
 	/**
@@ -160,7 +161,9 @@ export class ParticipantModeService {
 		observing: number;
 	} {
 		const total = participants.length;
-		const voting = participants.filter((p) => !p.isObserver).length;
+		const voting = participants.filter(
+			(p) => !p.isObserver && (p.isHost || p.isConnected !== false)
+		).length;
 		const observing = total - voting;
 
 		return { total, voting, observing };

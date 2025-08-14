@@ -81,20 +81,22 @@ export class PostgresSessionStore {
 		hostName: string,
 		userId: string,
 		title?: string,
-		storyPointScale?: string[]
+		storyPointScale?: string[],
+		roundDescription?: string
 	): Promise<ServerSession> {
 		const pool = getPool();
 
 		try {
 			await pool.query('BEGIN');
 
-			// Create session with provided title and scale
+			// Create session with provided title, scale, and round description
 			const sessionTitle = title || 'Sprint Planning Session';
 			const scale = storyPointScale || ['0', '1', '2', '3', '5', '8', '?'];
+			const currentRoundDescription = roundDescription || 'Round 1';
 
 			await pool.query(
-				`INSERT INTO sessions (session_code, title, story_point_scale) VALUES ($1, $2, $3)`,
-				[sessionCode, sessionTitle, JSON.stringify(scale)]
+				`INSERT INTO sessions (session_code, title, story_point_scale, current_round_description) VALUES ($1, $2, $3, $4)`,
+				[sessionCode, sessionTitle, JSON.stringify(scale), currentRoundDescription]
 			);
 
 			// Add host participant

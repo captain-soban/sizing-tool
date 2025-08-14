@@ -157,17 +157,21 @@
 														</div>
 													</td>
 													<td class="px-4 py-2">
-														{#if participant.lastSeen && Date.now() - participant.lastSeen < 5 * 60 * 1000}
+														{#if participant.isHost || participant.isConnected !== false}
 															<span
 																class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800"
 															>
-																Online
+																{#if participant.isHost}
+																	🏛️ Host (Always Online)
+																{:else}
+																	🟢 Connected
+																{/if}
 															</span>
 														{:else}
 															<span
 																class="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800"
 															>
-																Offline
+																⚫ Disconnected
 															</span>
 														{/if}
 													</td>

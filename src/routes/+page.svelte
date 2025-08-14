@@ -73,14 +73,19 @@
 		showSetupModal = true;
 	}
 
-	async function handleSessionSetup(title: string, scale: string[]) {
+	async function handleSessionSetup(title: string, scale: string[], roundDescription: string) {
 		if (!playerName.trim()) return;
 
 		isCreating = true;
 		error = '';
 
 		try {
-			const session = await sessionClient.createSession(playerName.trim(), title, scale);
+			const session = await sessionClient.createSession(
+				playerName.trim(),
+				title,
+				scale,
+				roundDescription
+			);
 
 			// Add to recent sessions
 			addRecentSession({
@@ -89,9 +94,6 @@
 				isHost: true,
 				sessionTitle: title
 			});
-
-			// TODO: In future, we could save the initial round description to the session
-			// For now, it will be used when the first voting round is completed
 
 			goto(`/session/${session.sessionCode}`);
 		} catch (err) {

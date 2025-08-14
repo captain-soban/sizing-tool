@@ -68,12 +68,15 @@ export class ShareableLinkService {
 			// Track participant in database
 			await this.sessionClient.trackParticipant(sessionCode, playerName, false);
 
+			// Get current session data to preserve the title
+			const sessionData = await this.sessionClient.getSession(sessionCode);
+
 			// Add to recent sessions for future quick access
 			addRecentSession({
 				sessionCode,
 				playerName,
 				isHost: false,
-				sessionTitle: undefined // Will be updated when session data loads
+				sessionTitle: sessionData?.title
 			});
 
 			console.log(`[ShareableLinkService] Successfully joined ${sessionCode} as ${playerName}`);
@@ -95,12 +98,15 @@ export class ShareableLinkService {
 			// Rejoin the session
 			await this.sessionClient.joinSession(sessionCode, playerName, false);
 
-			// Update recent session timestamp (preserve host status)
+			// Get current session data to preserve the title
+			const sessionData = await this.sessionClient.getSession(sessionCode);
+
+			// Update recent session timestamp (preserve host status and title)
 			addRecentSession({
 				sessionCode,
 				playerName,
 				isHost,
-				sessionTitle: undefined
+				sessionTitle: sessionData?.title
 			});
 
 			console.log(`[ShareableLinkService] Successfully rejoined ${sessionCode} as ${playerName}`);

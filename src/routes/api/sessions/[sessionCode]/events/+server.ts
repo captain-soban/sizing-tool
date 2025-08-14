@@ -1,5 +1,10 @@
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
-import { sessionConnections } from '$lib/server/sseUtils';
+import {
+	sessionConnections,
+	addParticipantConnection,
+	removeParticipantConnection,
+	getSessionConnectionStatus
+} from '$lib/server/sseUtils';
 import { performLazyCleanup } from '$lib/server/lazyCleanup';
 import type { RequestHandler } from './$types';
 
@@ -14,8 +19,9 @@ interface ExtendedStream {
 }
 
 // GET /api/sessions/[sessionCode]/events - Server-Sent Events endpoint
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, url }) => {
 	const { sessionCode } = params;
+	const playerName = url.searchParams.get('playerName');
 
 	// Perform lazy cleanup
 	performLazyCleanup().catch((error) => {
@@ -30,7 +36,9 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	const stream = new ReadableStream({
 		start(controller) {
-			console.log(`[SSE] Client connected to session ${sessionCode}`);
+			console.log(
+				`[SSE] Client connected to session ${sessionCode}${playerName ? ` as ${playerName}` : ''}`
+			);
 
 			// Add this controller to the session's connections
 			if (!sessionConnections.has(sessionCode)) {
@@ -38,15 +46,26 @@ export const GET: RequestHandler = async ({ params }) => {
 			}
 			sessionConnections.get(sessionCode)!.add(controller);
 
+			// Add participant connection tracking if playerName is provided
+			if (playerName) {
+				addParticipantConnection(sessionCode, playerName, controller);
+			}
+
 			// Send initial session data
 			PostgresSessionStore.getSession(sessionCode)
 				.then((currentSession) => {
 					if (currentSession) {
+						// Update participants with real-time connection status
+						const participantsWithConnectionStatus = getSessionConnectionStatus(
+							currentSession.participants,
+							sessionCode
+						);
+
 						const data = JSON.stringify({
 							type: 'session-update',
 							sessionCode: currentSession.sessionCode,
 							title: currentSession.title,
-							participants: currentSession.participants,
+							participants: participantsWithConnectionStatus,
 							votingState: currentSession.votingState,
 							storyPointScale: currentSession.storyPointScale,
 							lastUpdated: currentSession.lastUpdated
@@ -76,14 +95,23 @@ export const GET: RequestHandler = async ({ params }) => {
 
 			// Cleanup on connection close
 			const cleanup = () => {
-				console.log(`[SSE] Client disconnected from session ${sessionCode}`);
+				console.log(
+					`[SSE] Client disconnected from session ${sessionCode}${playerName ? ` (${playerName})` : ''}`
+				);
 				clearInterval(heartbeatInterval);
+
+				// Remove from session connections
 				const connections = sessionConnections.get(sessionCode);
 				if (connections) {
 					connections.delete(controller);
 					if (connections.size === 0) {
 						sessionConnections.delete(sessionCode);
 					}
+				}
+
+				// Remove participant connection tracking
+				if (playerName) {
+					removeParticipantConnection(sessionCode, playerName);
 				}
 			};
 

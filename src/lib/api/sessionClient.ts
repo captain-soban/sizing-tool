@@ -18,13 +18,14 @@ export class SessionClient {
 	async createSession(
 		hostName: string,
 		title?: string,
-		storyPointScale?: string[]
+		storyPointScale?: string[],
+		roundDescription?: string
 	): Promise<SessionData> {
 		const userId = getUserId();
 		const response = await fetch('/api/sessions', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ hostName, userId, title, storyPointScale })
+			body: JSON.stringify({ hostName, userId, title, storyPointScale, roundDescription })
 		});
 
 		if (!response.ok) {
@@ -177,11 +178,17 @@ export class SessionClient {
 	}
 
 	// Connect to Server-Sent Events for real-time updates
-	connectToRealtime(sessionCode: string): void {
+	connectToRealtime(sessionCode: string, playerName?: string): void {
 		this.disconnect(); // Clean up any existing connection
 
-		console.log(`[SessionClient] Connecting to SSE for session ${sessionCode}`);
-		this.eventSource = new EventSource(`/api/sessions/${sessionCode}/events`);
+		const url = playerName
+			? `/api/sessions/${sessionCode}/events?playerName=${encodeURIComponent(playerName)}`
+			: `/api/sessions/${sessionCode}/events`;
+
+		console.log(
+			`[SessionClient] Connecting to SSE for session ${sessionCode}${playerName ? ` as ${playerName}` : ''}`
+		);
+		this.eventSource = new EventSource(url);
 
 		this.eventSource.onmessage = (event) => {
 			try {
