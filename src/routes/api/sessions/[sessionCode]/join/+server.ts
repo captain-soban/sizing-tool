@@ -1,11 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { broadcastSessionUpdate } from '$lib/server/sseUtils';
+import { performLazyCleanup } from '$lib/server/lazyCleanup';
 import type { RequestHandler } from './$types';
 
 // POST /api/sessions/[sessionCode]/join - Join existing session
 export const POST: RequestHandler = async ({ params, request }) => {
 	try {
+		// Perform lazy cleanup
+		performLazyCleanup().catch((error) => {
+			console.error('[API] Lazy cleanup error:', error);
+		});
 		const { sessionCode } = params;
 		const { playerName, userId, isObserver = false } = await request.json();
 

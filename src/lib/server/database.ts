@@ -233,11 +233,6 @@ if (typeof window === 'undefined') {
 		log.error('Check your .env file or create one based on .env.example');
 	});
 
-	// Run cleanup every 5 minutes
-	setInterval(
-		() => {
-			cleanupDatabase();
-		},
-		5 * 60 * 1000
-	);
+	// Note: Cleanup is now handled via lazy cleanup in API endpoints
+	// instead of setInterval to work with Vercel's serverless architecture
 }

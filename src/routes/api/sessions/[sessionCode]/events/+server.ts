@@ -1,5 +1,6 @@
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { sessionConnections } from '$lib/server/sseUtils';
+import { performLazyCleanup } from '$lib/server/lazyCleanup';
 import type { RequestHandler } from './$types';
 
 // Extended controller type with cleanup function
@@ -15,6 +16,11 @@ interface ExtendedStream {
 // GET /api/sessions/[sessionCode]/events - Server-Sent Events endpoint
 export const GET: RequestHandler = async ({ params }) => {
 	const { sessionCode } = params;
+
+	// Perform lazy cleanup
+	performLazyCleanup().catch((error) => {
+		console.error('[SSE] Lazy cleanup error:', error);
+	});
 
 	// Verify session exists
 	const session = await PostgresSessionStore.getSession(sessionCode);

@@ -33,14 +33,15 @@ npm run db:setup     # Create PostgreSQL database
 npm run db:reset     # Reset database (removes all data)
 ```
 
-### Docker Commands
+### Local Development (Optional Docker)
 ```bash
-npm run docker:up    # Start app and PostgreSQL with docker-compose
+npm run docker:up    # Start app and PostgreSQL with docker-compose (local dev only)
 npm run docker:down  # Stop and remove containers
 npm run docker:logs  # View container logs
 npm run docker:build # Build Docker image only
 npm run docker:run   # Run app container only (requires external DB)
 ```
+*Note: Docker is optional for local development. Production uses Vercel + Neon.*
 
 ## Code Architecture
 
@@ -76,13 +77,12 @@ The app follows this user journey:
 
 ### Build & Deployment
 
-- **Frontend**: SvelteKit with adapter for deployment target
+- **Frontend**: SvelteKit with Vercel adapter for serverless deployment
 - **Backend**: SvelteKit server routes for session management
 - **Real-time**: Server-Sent Events (SSE) for live updates
-- **Database**: PostgreSQL for persistent session storage
-- **Containerization**: Multi-stage Docker build with Node.js 18 Alpine
-- **Container Orchestration**: Docker Compose with app + PostgreSQL services
-- **Production**: Optimized Docker image with non-root user and health checks
+- **Database**: Neon PostgreSQL (managed cloud database)
+- **Deployment**: Vercel platform with automatic HTTPS and CDN
+- **Production**: Serverless functions with connection pooling and auto-scaling
 
 ### Session Management
 

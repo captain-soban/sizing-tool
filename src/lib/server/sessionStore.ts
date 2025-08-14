@@ -229,13 +229,8 @@ export class ServerSessionStore {
 	}
 }
 
-// Run cleanup every hour
-setInterval(
-	() => {
-		ServerSessionStore.cleanup();
-	},
-	60 * 60 * 1000
-);
+// Note: Cleanup is now handled via lazy cleanup in API endpoints
+// instead of setInterval to work with Vercel's serverless architecture
 
 // Admin interface
 export interface AdminSessionStore {

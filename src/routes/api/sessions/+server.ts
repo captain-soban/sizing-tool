@@ -1,11 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { generateSessionCode } from '$lib/stores/session';
+import { performLazyCleanup } from '$lib/server/lazyCleanup';
 import type { RequestHandler } from './$types';
 
 // POST /api/sessions - Create new session
 export const POST: RequestHandler = async ({ request }) => {
 	try {
+		// Perform lazy cleanup
+		performLazyCleanup().catch((error) => {
+			console.error('[API] Lazy cleanup error:', error);
+		});
 		const { hostName, userId, title, storyPointScale } = await request.json();
 
 		if (!hostName || typeof hostName !== 'string') {
@@ -51,6 +56,10 @@ export const POST: RequestHandler = async ({ request }) => {
 // GET /api/sessions - Get all sessions (for debugging)
 export const GET: RequestHandler = async () => {
 	try {
+		// Perform lazy cleanup
+		performLazyCleanup().catch((error) => {
+			console.error('[API] Lazy cleanup error:', error);
+		});
 		const sessions = await PostgresSessionStore.getAllSessions();
 		return json(
 			sessions.map((s) => ({

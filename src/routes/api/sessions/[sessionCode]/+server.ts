@@ -1,11 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import { broadcastSessionUpdate } from '$lib/server/sseUtils';
+import { performLazyCleanup } from '$lib/server/lazyCleanup';
 import type { RequestHandler } from './$types';
 
 // GET /api/sessions/[sessionCode] - Get session details
 export const GET: RequestHandler = async ({ params }) => {
 	try {
+		// Perform lazy cleanup
+		performLazyCleanup().catch((error) => {
+			console.error('[API] Lazy cleanup error:', error);
+		});
 		const { sessionCode } = params;
 		const session = await PostgresSessionStore.getSession(sessionCode);
 
@@ -30,6 +35,10 @@ export const GET: RequestHandler = async ({ params }) => {
 // PATCH /api/sessions/[sessionCode] - Update session details
 export const PATCH: RequestHandler = async ({ params, request }) => {
 	try {
+		// Perform lazy cleanup
+		performLazyCleanup().catch((error) => {
+			console.error('[API] Lazy cleanup error:', error);
+		});
 		const { sessionCode } = params;
 		const updates = await request.json();
 

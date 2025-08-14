@@ -26,11 +26,6 @@
 	async function handleSubmit(e: Event) {
 		if (e) e.preventDefault();
 
-		if (!description.trim()) {
-			error = 'Please enter a description for the new round';
-			return;
-		}
-
 		try {
 			error = '';
 			await onConfirm(description.trim());
@@ -66,13 +61,15 @@
 		<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" role="document">
 			<div class="mb-4">
 				<h2 id="new-round-title" class="text-lg font-semibold text-gray-900">Start New Round</h2>
-				<p class="mt-1 text-sm text-gray-600">Enter a description for the next voting round</p>
+				<p class="mt-1 text-sm text-gray-600">
+					Enter an optional description for the next voting round
+				</p>
 			</div>
 
 			<form onsubmit={handleSubmit}>
 				<div class="mb-4">
 					<Label for="round-description" class="text-sm font-medium text-gray-700">
-						Round Description
+						Round Description (Optional)
 					</Label>
 					<Input
 						id="round-description"
@@ -92,11 +89,7 @@
 					<Button type="button" variant="outline" onclick={onClose} disabled={isLoading}>
 						Cancel
 					</Button>
-					<Button
-						type="submit"
-						disabled={isLoading || !description.trim()}
-						class="bg-blue-600 hover:bg-blue-700"
-					>
+					<Button type="submit" disabled={isLoading} class="bg-blue-600 hover:bg-blue-700">
 						{#if isLoading}
 							Starting...
 						{:else}

@@ -15,67 +15,53 @@ A real-time Planning Poker application for agile development teams, built with S
 - **Responsive Design** - Works seamlessly on desktop and mobile devices
 - **Anonymous Support** - Use real names or nicknames for privacy
 - **Admin Dashboard** - Comprehensive admin interface for session monitoring and management
-- **Docker Support** - Full containerization with Docker and Docker Compose
+- **Cloud-Ready** - Deployed on Vercel with Neon PostgreSQL
 - **Real-time Statistics** - Live monitoring of sessions, participants, and activity
 
 ## Technology Stack
 
 - **Frontend**: SvelteKit 2.22 with Svelte 5 (runes API)
 - **Backend**: SvelteKit server routes with TypeScript
-- **Database**: PostgreSQL with connection pooling
+- **Database**: Neon PostgreSQL (managed cloud database)
+- **Deployment**: Vercel (serverless functions + CDN)
 - **Real-time**: Server-Sent Events (SSE) for live updates
 - **Styling**: Tailwind CSS 4 with shadcn-svelte components
 - **Testing**: Vitest + Playwright for unit and E2E tests
 
 ## Quick Start
 
-### Option 1: Docker (Recommended)
+### Local Development
 
-**Prerequisites**: Docker and Docker Compose
+**Prerequisites**: Node.js 18+, npm or yarn
 
-1. **Clone and start**
+**Option 1: With Local PostgreSQL**
+1. **Clone and install**
    ```bash
    git clone <repository-url>
    cd sizing-tool
-   npm run docker:up
-   ```
-
-2. **Open your browser**
-   Navigate to `http://localhost:3000`
-
-That's it! PostgreSQL and the app are running in containers.
-
-### Option 2: Local Development
-
-**Prerequisites**: Node.js 18+, PostgreSQL 12+, npm or yarn
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd sizing-tool
-   ```
-
-2. **Install dependencies**
-   ```bash
    npm install
    ```
 
-3. **Set up PostgreSQL database**
+2. **Set up PostgreSQL database**
    ```bash
-   # Create database
    npm run db:setup
-   
-   # Configure environment (copy and edit)
-   cp .env.example .env
+   cp .env.example .env  # Edit with your database URL
    ```
 
-4. **Start development server**
+3. **Start development**
    ```bash
-   npm run dev
+   npm run dev  # Visit http://localhost:5173
    ```
 
-5. **Open your browser**
-   Navigate to `http://localhost:5173`
+**Option 2: With Docker (PostgreSQL included)**
+```bash
+npm run docker:up  # Visit http://localhost:3000
+```
+
+**Option 3: With Cloud Database (Neon/Supabase)**
+1. Create database at [neon.tech](https://neon.tech) or [supabase.com](https://supabase.com)
+2. Set `DATABASE_URL` in `.env`
+3. Run `npm run dev`
 
 ## Database Setup
 
@@ -306,7 +292,7 @@ vercel --prod
 4. Select region closest to your users
 5. Copy the `POSTGRES_URL` connection string
 
-*Option B: Neon (Free Tier)*
+*Option B: Neon (Recommended Free Tier)*
 1. Sign up at [neon.tech](https://neon.tech)
 2. Create new project: "Planning Poker"
 3. Copy connection string from dashboard
@@ -429,71 +415,30 @@ Your project includes `vercel.json` with optimized settings:
 3. Set `DATABASE_URL` and `NODE_ENV=production`
 4. Deploy
 
-#### 🐳 Docker Deployment
+#### 🐳 Docker Deployment (Alternative)
 
-**Quick Docker deployment** (includes PostgreSQL):
+*Note: Docker is primarily for local development. Production uses Vercel + Neon.*
 
-1. **Clone and deploy:**
-   ```bash
-   git clone <repository-url>
-   cd sizing-tool
-   npm run docker:up
-   ```
+**Local Docker setup** (includes PostgreSQL):
+```bash
+git clone <repository-url>
+cd sizing-tool
+npm run docker:up  # Access at http://localhost:3000
+```
 
-2. **Access your app at `http://localhost:3000`**
+**Self-hosted Docker:**
+1. Edit `docker-compose.yml` for production environment variables
+2. Deploy: `docker-compose up -d`
+3. Monitor: `npm run docker:logs`
 
-**Custom Docker deployment:**
+#### 🖥️ VPS/Traditional Server (Alternative)
 
-1. **Edit docker-compose.yml for production:**
-   ```yaml
-   # Update environment variables in docker-compose.yml
-   environment:
-     - DATABASE_URL=postgresql://postgres:your_secure_password@db:5432/planning_poker
-     - NODE_ENV=production
-   ```
+*Note: Self-hosting is an alternative to Vercel + Neon.*
 
-2. **Deploy:**
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **View logs:**
-   ```bash
-   npm run docker:logs
-   ```
-
-#### 🖥️ VPS/Traditional Server
-
-1. **Prepare server with Node.js 18+ and PostgreSQL**
-
-2. **Clone and build:**
-   ```bash
-   git clone <your-repo-url>
-   cd sizing-tool
-   npm ci --production
-   npm run build
-   ```
-
-3. **Set up database:**
-   ```bash
-   # Create database and user
-   sudo -u postgres createdb planning_poker
-   sudo -u postgres createuser planningpoker
-   ```
-
-4. **Configure environment:**
-   ```bash
-   export DATABASE_URL=postgresql://planningpoker:password@localhost:5432/planning_poker
-   export NODE_ENV=production
-   ```
-
-5. **Start with PM2:**
-   ```bash
-   npm install -g pm2
-   pm2 start build/index.js --name planning-poker
-   pm2 startup
-   pm2 save
-   ```
+1. **Setup:** Node.js 18+ and PostgreSQL on your server
+2. **Deploy:** `git clone`, `npm ci --production`, `npm run build`
+3. **Database:** Create PostgreSQL database and set `DATABASE_URL`
+4. **Run:** Use PM2 or similar process manager
 
 ### Database Setup in Production
 

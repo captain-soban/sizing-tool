@@ -486,7 +486,7 @@
 	}
 
 	async function handleNewRound(description: string) {
-		if (!isHost || !description.trim()) {
+		if (!isHost) {
 			throw new Error('Invalid state for starting new round');
 		}
 

@@ -1,9 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
+import { forceCleanup } from '$lib/server/lazyCleanup';
 
 export const GET: RequestHandler = async () => {
 	try {
+		// Force cleanup for admin operations to ensure fresh data
+		await forceCleanup();
+
 		console.log('[Admin API] Fetching all sessions...');
 		const allSessions = await PostgresSessionStore.getAllSessions();
 		console.log('[Admin API] Found sessions:', allSessions.length);

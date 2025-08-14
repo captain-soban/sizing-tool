@@ -24,16 +24,15 @@ export const POST: RequestHandler = async ({ request, params }) => {
 			finalEstimate
 		}: CreateRoundRequest = await request.json();
 
-		// Validate input
-		if (!newRoundDescription?.trim()) {
-			return json({ error: 'Round description is required' }, { status: 400 });
-		}
-
 		// Get current session state
 		const currentSession = await PostgresSessionStore.getSession(sessionCode);
 		if (!currentSession) {
 			return json({ error: 'Session not found' }, { status: 404 });
 		}
+
+		// Validate input - description is now optional, generate default if empty
+		const description =
+			newRoundDescription?.trim() || `Round ${currentSession.votingState.currentRound + 1}`;
 
 		const pool = getPool();
 		let completedRoundData = null;
@@ -112,13 +111,13 @@ export const POST: RequestHandler = async ({ request, params }) => {
 				     current_round = $2, current_round_description = $3,
 				     updated_at = NOW()
 				 WHERE session_code = $1`,
-				[sessionCode, newRoundNumber, newRoundDescription.trim()]
+				[sessionCode, newRoundNumber, description]
 			);
 
 			await pool.query('COMMIT');
 
 			log.database(
-				`Created new round ${newRoundNumber} for session ${sessionCode}: "${newRoundDescription}"`
+				`Created new round ${newRoundNumber} for session ${sessionCode}: "${description}"`
 			);
 
 			// Get updated session data
