@@ -309,4 +309,22 @@ export class SessionClient {
 		const data = await response.json();
 		return data.sessions;
 	}
+
+	// Verify if user is the original host of a session
+	async verifyHost(sessionCode: string, playerName: string): Promise<boolean> {
+		const userId = getUserId();
+		const response = await fetch(`/api/sessions/${sessionCode}/verify-host`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ userId, playerName })
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to verify host status');
+		}
+
+		const data = await response.json();
+		return data.isHost;
+	}
 }

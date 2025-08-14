@@ -217,20 +217,29 @@ export class PostgresSessionStore {
 
 			// Insert or update participant
 			// First try to update existing participant by userId, then by name, then insert
+			// IMPORTANT: Never downgrade a host - only upgrade to host or maintain host status
 			const updateByUserId = await pool.query(
 				`UPDATE participants 
-				 SET name = $2, is_host = $4, is_observer = $5, last_seen = NOW()
+				 SET name = $2, 
+					 is_host = CASE WHEN is_host = TRUE THEN TRUE ELSE $4 END,
+					 is_observer = $5, 
+					 last_seen = NOW()
 				 WHERE session_code = $1 AND user_id = $3`,
 				[sessionCode, playerName, userId, shouldBeHost, isObserver]
 			);
 
 			if (updateByUserId.rowCount === 0) {
 				// No existing participant found by userId, try insert with conflict resolution by name
+				// IMPORTANT: Never downgrade a host - only upgrade to host or maintain host status
 				await pool.query(
 					`INSERT INTO participants (session_code, name, user_id, is_host, is_observer, last_seen)
 					 VALUES ($1, $2, $3, $4, $5, NOW())
 					 ON CONFLICT (session_code, name)
-					 DO UPDATE SET user_id = $3, is_host = $4, is_observer = $5, last_seen = NOW()`,
+					 DO UPDATE SET 
+						user_id = $3, 
+						is_host = CASE WHEN participants.is_host = TRUE THEN TRUE ELSE $4 END,
+						is_observer = $5, 
+						last_seen = NOW()`,
 					[sessionCode, playerName, userId, shouldBeHost, isObserver]
 				);
 			}
@@ -493,6 +502,31 @@ export class PostgresSessionStore {
 		} catch (error) {
 			console.error(`[PostgresSessionStore] Error removing participant:`, error);
 			return null;
+		}
+	}
+
+	static async isOriginalHost(
+		sessionCode: string,
+		userId: string,
+		playerName: string
+	): Promise<boolean> {
+		const pool = getPool();
+
+		try {
+			// Check if this user is the original host of the session
+			// We check both by userId and playerName for compatibility
+			const hostResult = await pool.query(
+				`SELECT 1 FROM participants 
+				 WHERE session_code = $1 
+				 AND is_host = TRUE 
+				 AND (user_id = $2 OR name = $3)`,
+				[sessionCode, userId, playerName]
+			);
+
+			return hostResult.rows.length > 0;
+		} catch (error) {
+			console.error(`[PostgresSessionStore] Error checking host status:`, error);
+			return false;
 		}
 	}
 

@@ -114,13 +114,24 @@
 
 		try {
 			const upperSessionCode = sessionCode.toUpperCase();
-			await sessionClient.joinSession(upperSessionCode, playerName.trim());
+			const trimmedPlayerName = playerName.trim();
 
-			// Add to recent sessions
+			// Verify if user is the original host from database
+			let isOriginalHost = false;
+			try {
+				isOriginalHost = await sessionClient.verifyHost(upperSessionCode, trimmedPlayerName);
+			} catch (hostError) {
+				console.warn('[Landing] Could not verify host status:', hostError);
+				isOriginalHost = false;
+			}
+
+			await sessionClient.joinSession(upperSessionCode, trimmedPlayerName);
+
+			// Add to recent sessions with verified host status
 			addRecentSession({
 				sessionCode: upperSessionCode,
-				playerName: playerName.trim(),
-				isHost: false,
+				playerName: trimmedPlayerName,
+				isHost: isOriginalHost,
 				sessionTitle: undefined
 			});
 
@@ -144,13 +155,24 @@
 
 		try {
 			const upperSessionCode = recentSession.sessionCode.toUpperCase();
+
+			// Verify if user is the original host from database
+			let isOriginalHost = false;
+			try {
+				isOriginalHost = await sessionClient.verifyHost(upperSessionCode, recentSession.playerName);
+			} catch (hostError) {
+				console.warn('[Landing] Could not verify host status:', hostError);
+				// Fallback to stored value if verification fails
+				isOriginalHost = recentSession.isHost || false;
+			}
+
 			await sessionClient.joinSession(upperSessionCode, recentSession.playerName);
 
-			// Update recent session with preserved host status
+			// Update recent session with verified host status
 			addRecentSession({
 				sessionCode: upperSessionCode,
 				playerName: recentSession.playerName,
-				isHost: recentSession.isHost, // Preserve original host status
+				isHost: isOriginalHost,
 				sessionTitle: recentSession.sessionTitle
 			});
 

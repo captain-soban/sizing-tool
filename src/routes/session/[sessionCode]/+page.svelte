@@ -20,7 +20,8 @@
 	import {
 		type Participant,
 		type VotingRound,
-		updateRecentSessionTitle
+		updateRecentSessionTitle,
+		addRecentSession
 	} from '$lib/stores/session';
 	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
 	import {
@@ -293,6 +294,16 @@
 
 		// Update recent session title if it changed
 		updateRecentSessionTitle(sessionCode, playerName, sessionData.title);
+
+		// Update localStorage with correct host status if changed
+		if (currentParticipant && currentParticipant.isHost !== undefined) {
+			addRecentSession({
+				sessionCode,
+				playerName,
+				isHost: currentParticipant.isHost,
+				sessionTitle: sessionData.title
+			});
+		}
 	}
 
 	// function saveSessionState() {
