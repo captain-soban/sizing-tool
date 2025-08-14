@@ -2,9 +2,6 @@ import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import { dev } from '$app/environment';
 
-// Create logs directory if it doesn't exist
-const logsDir = 'logs';
-
 // Define log format
 const logFormat = winston.format.combine(
 	winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -16,70 +13,73 @@ const logFormat = winston.format.combine(
 	})
 );
 
-// Create daily rotate file transport for all logs
-const fileRotateTransport = new DailyRotateFile({
-	filename: `${logsDir}/app-%DATE%.log`,
-	datePattern: 'YYYY-MM-DD',
-	maxSize: '20m',
-	maxFiles: '14d',
-	format: logFormat
-});
-
-// Create daily rotate file transport for errors only
-const errorFileRotateTransport = new DailyRotateFile({
-	filename: `${logsDir}/error-%DATE%.log`,
-	datePattern: 'YYYY-MM-DD',
-	level: 'error',
-	maxSize: '20m',
-	maxFiles: '30d',
-	format: logFormat
-});
-
-// Create console transport for development
+// Create console transport
 const consoleTransport = new winston.transports.Console({
-	format: winston.format.combine(
-		winston.format.colorize(),
-		winston.format.simple(),
-		winston.format.printf(({ timestamp, level, message }) => {
-			return `${timestamp} [${level}] ${message}`;
-		})
-	)
+	format: dev
+		? winston.format.combine(
+				winston.format.colorize(),
+				winston.format.simple(),
+				winston.format.printf(({ timestamp, level, message }) => {
+					return `${timestamp} [${level}] ${message}`;
+				})
+			)
+		: winston.format.combine(winston.format.simple())
 });
+
+// Function to create file transports (only in development)
+function createFileTransports() {
+	if (!dev) return [];
+
+	const logsDir = 'logs';
+
+	return [
+		new DailyRotateFile({
+			filename: `${logsDir}/app-%DATE%.log`,
+			datePattern: 'YYYY-MM-DD',
+			maxSize: '20m',
+			maxFiles: '14d',
+			format: logFormat
+		}),
+		new DailyRotateFile({
+			filename: `${logsDir}/error-%DATE%.log`,
+			datePattern: 'YYYY-MM-DD',
+			level: 'error',
+			maxSize: '20m',
+			maxFiles: '30d',
+			format: logFormat
+		})
+	];
+}
 
 // Configure winston logger
 const logger = winston.createLogger({
 	level: dev ? 'debug' : 'info',
 	format: logFormat,
-	transports: [fileRotateTransport, errorFileRotateTransport, ...(dev ? [consoleTransport] : [])],
-	// Handle uncaught exceptions and rejections
-	exceptionHandlers: [
-		new DailyRotateFile({
-			filename: `${logsDir}/exceptions-%DATE%.log`,
-			datePattern: 'YYYY-MM-DD',
-			maxSize: '20m',
-			maxFiles: '30d',
-			format: logFormat
-		})
-	],
-	rejectionHandlers: [
-		new DailyRotateFile({
-			filename: `${logsDir}/rejections-%DATE%.log`,
-			datePattern: 'YYYY-MM-DD',
-			maxSize: '20m',
-			maxFiles: '30d',
-			format: logFormat
-		})
-	]
+	transports: [consoleTransport, ...createFileTransports()],
+	// Handle uncaught exceptions and rejections (file logging only in development)
+	exceptionHandlers: dev
+		? [
+				new DailyRotateFile({
+					filename: `logs/exceptions-%DATE%.log`,
+					datePattern: 'YYYY-MM-DD',
+					maxSize: '20m',
+					maxFiles: '30d',
+					format: logFormat
+				})
+			]
+		: [consoleTransport],
+	rejectionHandlers: dev
+		? [
+				new DailyRotateFile({
+					filename: `logs/rejections-%DATE%.log`,
+					datePattern: 'YYYY-MM-DD',
+					maxSize: '20m',
+					maxFiles: '30d',
+					format: logFormat
+				})
+			]
+		: [consoleTransport]
 });
-
-// In production, also log to console for container logs
-if (!dev) {
-	logger.add(
-		new winston.transports.Console({
-			format: winston.format.combine(winston.format.simple())
-		})
-	);
-}
 
 // Create structured logging functions
 export const log = {
