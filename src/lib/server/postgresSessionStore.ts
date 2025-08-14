@@ -450,6 +450,52 @@ export class PostgresSessionStore {
 		}
 	}
 
+	static async removeParticipant(
+		sessionCode: string,
+		playerName: string
+	): Promise<ServerSession | null> {
+		const pool = getPool();
+
+		try {
+			// Check if participant exists and is not the host
+			const participantResult = await pool.query(
+				`SELECT is_host FROM participants WHERE session_code = $1 AND name = $2`,
+				[sessionCode, playerName]
+			);
+
+			if (participantResult.rows.length === 0) {
+				console.log(`[PostgresSessionStore] Participant ${playerName} not found in ${sessionCode}`);
+				return null;
+			}
+
+			const isHost = participantResult.rows[0].is_host;
+			if (isHost) {
+				console.log(`[PostgresSessionStore] Cannot remove host ${playerName} from ${sessionCode}`);
+				return null;
+			}
+
+			// Remove the participant
+			const result = await pool.query(
+				`DELETE FROM participants WHERE session_code = $1 AND name = $2`,
+				[sessionCode, playerName]
+			);
+
+			if (result.rowCount === 0) {
+				console.log(
+					`[PostgresSessionStore] Failed to remove participant ${playerName} from ${sessionCode}`
+				);
+				return null;
+			}
+
+			console.log(`[PostgresSessionStore] Removed participant ${playerName} from ${sessionCode}`);
+
+			return await this.getSession(sessionCode);
+		} catch (error) {
+			console.error(`[PostgresSessionStore] Error removing participant:`, error);
+			return null;
+		}
+	}
+
 	static async getAllSessions(): Promise<ServerSession[]> {
 		const pool = getPool();
 

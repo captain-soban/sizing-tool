@@ -38,7 +38,8 @@
 		Theater,
 		Rocket,
 		Lightbulb,
-		CheckCircle
+		CheckCircle,
+		UserMinus
 	} from '@lucide/svelte';
 
 	const sessionCode = $page.params.sessionCode!;
@@ -71,6 +72,8 @@
 	let showShareableLinkModal = $state(false);
 	let shareableLinkError = $state('');
 	let isJoiningViaLink = $state(false);
+	let participantToRemove = $state<string | null>(null);
+	let showRemoveConfirmation = $state(false);
 	let roundService: RoundService;
 	let participantModeService: ParticipantModeService;
 	let shareableLinkService: ShareableLinkService;
@@ -649,6 +652,31 @@
 	function allParticipantsVoted(): boolean {
 		return ParticipantModeService.allVotingParticipantsHaveVoted(participants);
 	}
+
+	// Remove participant functions
+	function confirmRemoveParticipant(participantName: string) {
+		if (!isHost) return;
+		participantToRemove = participantName;
+		showRemoveConfirmation = true;
+	}
+
+	function cancelRemoveParticipant() {
+		participantToRemove = null;
+		showRemoveConfirmation = false;
+	}
+
+	async function removeParticipant() {
+		if (!isHost || !participantToRemove || !sessionClient) return;
+
+		try {
+			await sessionClient.removeParticipant(sessionCode, participantToRemove);
+			console.log(`[Session] Removed participant: ${participantToRemove}`);
+		} catch (error) {
+			console.error('[Session] Error removing participant:', error);
+		} finally {
+			cancelRemoveParticipant();
+		}
+	}
 </script>
 
 <div class="min-h-screen p-4">
@@ -935,8 +963,19 @@
 					>
 						<div class="flex flex-col items-center">
 							<!-- Participant Card -->
-							<Card class="work-area w-24 sm:w-28">
+							<Card class="work-area relative w-24 sm:w-28">
 								<CardContent class="p-1.5 text-center sm:p-2">
+									<!-- Host Remove Button (only show for host viewing other participants) -->
+									{#if isHost && participant.name !== playerName && !participant.isHost}
+										<button
+											onclick={() => confirmRemoveParticipant(participant.name)}
+											class="absolute -top-1 -right-1 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white transition-colors hover:bg-red-600"
+											title="Remove participant"
+										>
+											<UserMinus class="h-2.5 w-2.5" />
+										</button>
+									{/if}
+
 									<!-- Participant Name and Badges -->
 									<div class="mb-1 flex flex-col items-center space-y-0.5">
 										<span
@@ -1130,6 +1169,32 @@
 	onConfirm={handleNewRound}
 	isLoading={isStartingNewRound}
 />
+
+<!-- Remove Participant Confirmation Dialog -->
+{#if showRemoveConfirmation && participantToRemove}
+	<div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+		<Card class="w-96 max-w-[90vw] bg-white">
+			<CardContent class="p-6">
+				<h3 class="mb-4 text-lg font-semibold">Remove Participant</h3>
+				<p class="mb-6 text-gray-600">
+					Are you sure you want to remove <strong>{participantToRemove}</strong> from this session? This
+					action cannot be undone.
+				</p>
+				<div class="flex justify-end gap-3">
+					<Button variant="outline" onclick={cancelRemoveParticipant} class="btn-poker-gray">
+						Cancel
+					</Button>
+					<Button
+						onclick={removeParticipant}
+						class="border-red-500 bg-red-500 text-white hover:border-red-600 hover:bg-red-600"
+					>
+						Remove
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
+	</div>
+{/if}
 
 <style>
 	@keyframes pulse {

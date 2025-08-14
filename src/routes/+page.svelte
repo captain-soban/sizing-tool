@@ -181,18 +181,6 @@
 </script>
 
 <div class="relative flex min-h-screen items-center justify-center p-4">
-	<!-- Admin Dashboard Button - Upper Right -->
-	<div class="absolute top-4 right-4 z-10">
-		<Button
-			onclick={() => (window.location.href = '/admin')}
-			variant="outline"
-			size="sm"
-			class="text-xs text-gray-500 hover:text-gray-700"
-		>
-			Admin Dashboard
-		</Button>
-	</div>
-
 	<Card class="work-area w-full max-w-md">
 		<CardHeader>
 			<div class="flex justify-center">

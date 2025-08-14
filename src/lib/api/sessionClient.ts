@@ -91,6 +91,23 @@ export class SessionClient {
 		return response.json();
 	}
 
+	// Remove participant from session (host only)
+	async removeParticipant(sessionCode: string, playerName: string): Promise<SessionData> {
+		const response = await fetch(
+			`/api/sessions/${sessionCode}/participants/${encodeURIComponent(playerName)}`,
+			{
+				method: 'DELETE'
+			}
+		);
+
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.error || 'Failed to remove participant');
+		}
+
+		return response.json();
+	}
+
 	// Update voting state
 	async updateVotingState(
 		sessionCode: string,

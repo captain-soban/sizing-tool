@@ -31,3 +31,31 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}
 };
+
+// DELETE /api/sessions/[sessionCode]/participants/[playerName] - Remove participant
+export const DELETE: RequestHandler = async ({ params }) => {
+	try {
+		const { sessionCode, playerName } = params;
+
+		const session = await PostgresSessionStore.removeParticipant(sessionCode, playerName);
+
+		if (!session) {
+			return json({ error: 'Session or participant not found' }, { status: 404 });
+		}
+
+		// Broadcast update to all connected clients
+		await broadcastSessionUpdate(sessionCode);
+
+		return json({
+			sessionCode: session.sessionCode,
+			title: session.title,
+			participants: session.participants,
+			votingState: session.votingState,
+			storyPointScale: session.storyPointScale,
+			lastUpdated: session.lastUpdated
+		});
+	} catch (error) {
+		console.error('[API] Error removing participant:', error);
+		return json({ error: 'Internal server error' }, { status: 500 });
+	}
+};
