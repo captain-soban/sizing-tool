@@ -58,8 +58,11 @@ export class ServerSessionStore {
 		}
 
 		// Clean up inactive participants (haven't been seen in 30 seconds)
+		// But never remove the host, even if inactive
 		const now = Date.now();
-		const activeParticipants = session.participants.filter((p) => now - (p.lastSeen || 0) < 30000);
+		const activeParticipants = session.participants.filter(
+			(p) => p.isHost || now - (p.lastSeen || 0) < 30000
+		);
 
 		if (activeParticipants.length !== session.participants.length) {
 			session.participants = activeParticipants;

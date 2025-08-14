@@ -21,16 +21,20 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 - **Anonymous Mode**: Support for anonymous voting with nickname option
 - **Name Flexibility**: Allow real names or nicknames based on team preferences
 - **User Roles**: Distinguish between session owner and participants
-  -- Each user can switch from observer or active in the planning poker page
-  --- Visual and text indicator if their active or observer
-  **Shareable Link** Share link button. When a user clicks the share link button it should copy a link that redirects a user that uses this link to the current session. it should ask the user for a name. if the user has previously joined the planning poker session provided in the link it should use the name previously used.
+- **Observer/Voter Toggle**: Each user can switch between observer and active voter modes
+- **Visual Indicators**: Clear visual and text indicators for active/observer status
+- **Shareable Links**: Share link button that copies session URL for easy participant access
+- **Smart Name Persistence**: Remembers previously used names for returning users
+- **Participant Stats**: Display voting participation metrics and statistics
+- **Mode Toggle Component**: Dedicated UI component for switching participant modes
 
 ### Voting System
-- Real time voting
-  - Participants can see each other in the poker planning session
-    -- they can see if a player has voted or not
-    -- participants can see who is observing or an active participant
-      --- animated icon if a plarticipant is still deciding on a vote
+
+- **Real-time Voting**: Live voting with instant participant visibility
+- **Participant Display**: Visual representation of all session participants around poker table
+- **Vote Status Indicators**: Clear visual indicators showing who has voted vs. who is still deciding
+- **Observer Visibility**: Display which participants are observing vs. actively voting
+- **Animated Vote Icons**: Dynamic animations indicating voting progress for each participant
 - **Story Point Scales**: Configurable voting scales in settings
   - Fibonacci 0-8 (default)
   - Fibonacci 1-8
@@ -38,46 +42,62 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
   - T-shirt sizes (S, M, L, XL)
   - Linear 1-8
   - Custom comma-delimited values
-- **Vote Collection**: Collect and display votes from all participants
-  -- Icon for each participant
-  --- Animated icon should indicate if a vote has been cast or not.
-- **Vote Reveal**: Simultaneous reveal of all votes
-  -- Show average
-  -- Icon of each participant should display each of their votes.
+- **Vote Collection**: Secure collection and storage of participant votes
+- **Vote Reveal**: Owner-controlled simultaneous reveal of all votes
+- **Average Calculation**: Automatic average calculation with manual override option
+- **Round Management**: Support for multiple voting rounds within a session
+- **Round Titles**: Optional descriptive titles for each voting round
+- **Vote History**: Tracking and display of previous round results
 
 ### UI Layout & Navigation
 
 - **Settings Access**: Gear icon button in top-right corner
 - **Exit Function**: Exit button next to settings leading to landing page
 - **Responsive Design**: Lightweight and responsive UI using Tailwind CSS v4
-- **Component Library**: Built with shadcn-svelte components
-- **Poker Planning**: Participants are displayed around a "Poker Table" shape
-  -- The poker table will display the title or description of what is being estimated and the average of the votes
-  --- during the voting phase the average will be empty
-  --- during the vote reveal phase the average will be displayed
-  --- the session owner has control on the vote reveal, accept the average or change the final result.
+- **Component Library**: Built with shadcn-svelte components and custom Svelte 5 components
+- **Poker Table Layout**: Participants displayed around virtual poker table shape
+- **Dynamic Table Center**: Displays session title and voting results
+  - Empty during voting phase
+  - Shows average and individual votes after reveal
+  - Owner controls for reveal, accept average, or manual override
+- **Observer Notice**: Clear messaging for users in observer mode
+- **Participant Mode Toggle**: Easy switching between voter and observer modes
+- **Share Modal**: Dedicated modal for generating and copying shareable session links
 
-## Enhanced Features (Future Iterations)
+## Enhanced Features (Current Implementation)
+
+### Admin Dashboard
+- **Session Monitoring**: Real-time dashboard at `/admin` for monitoring all sessions
+- **Session Statistics**: Live counts of total, active sessions and participants  
+- **Session Management**: View, terminate, and delete sessions with confirmation
+- **Participant Tracking**: Detailed participant information with online/offline status
+- **Search and Filter**: Search sessions by code, title, or host name
+- **Session Details Modal**: Comprehensive session information and participant lists
+
+### Database Features
+- **PostgreSQL Integration**: Persistent storage with Neon cloud database
+- **Real-time Synchronization**: SSE-based live updates across all participants
+- **Automatic Cleanup**: Inactive participant and session cleanup
+- **Database Monitoring**: Development page showing database connection and table info
+- **Connection Pooling**: Optimized database connections for production scaling
+
+## Future Enhancement Ideas
 
 ### Advanced Voting
+- **Timer Function**: Optional voting timers for time-boxed estimation
+- **Vote Confidence**: Confidence levels for each vote
+- **Estimation Templates**: Pre-configured estimation scales for different project types
 
-- **Vote History**: Track voting history for stories
-- **Timer Function**: Optional voting timers
-- **Moderator Controls**: Enhanced session management for owners
+### User Experience  
+- **Help System**: Context-sensitive help icons and documentation
+- **Accessibility**: Enhanced ARIA labels and keyboard navigation
+- **Mobile App**: Native mobile application for iOS/Android
+- **Theme Customization**: User-selectable color themes and branding
 
-### User Experience
-
-- **Recent Sessions UI**: Elegant card-based interface for quick session access
-- **Smart Session Tracking**: Automatic session title updates and timestamp tracking
-- **Theme Support**: Red, white, blue color scheme with customization
-- **Accessibility**: ARIA labels and keyboard navigation
-- **Mobile Optimization**: Touch-friendly interface for mobile devices
-
-### Session Features
-
-- **Story Management**: Add/edit story descriptions
-- **Session Export**: Export results in various formats
-- **Session Templates**: Predefined voting configurations
+### Analytics & Reporting
+- **Session Analytics**: Voting patterns and team velocity metrics
+- **Export Functions**: Export session results to CSV, PDF, or project management tools
+- **Historical Reporting**: Long-term estimation accuracy and team performance insights
 
 ## Technical Implementation Notes
 

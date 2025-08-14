@@ -96,6 +96,10 @@ The app follows this user journey:
 - **User Roles**: Distinguishes between session owner (host) and participants
 - **Session Titles**: Each session has a descriptive title (sprint cycle, epic, or feature name)
 - **Multi-user Support**: Real-time participant visibility and voting
+- **Observer Mode**: Participants can toggle between active voting and observer mode
+- **Participant Stats**: Display voting statistics and participation metrics
+- **Shareable Links**: Generate and share session links for easy participant access
+- **Round Management**: Support for multiple voting rounds within a session with optional titles
 
 ## Key Features & Business Logic
 
@@ -136,6 +140,9 @@ The app follows this user journey:
 - **Automatic Cleanup**: Inactive participants and old sessions removed automatically
 - **Admin API**: RESTful endpoints for session management and statistics
 - **Participant Tracking**: Last seen timestamps and online/offline status
+- **Participant Mode Service**: Centralized service for managing observer/voter state transitions
+- **Round History**: Storage and retrieval of multiple voting rounds within sessions
+- **Database Monitoring**: Optional database information page for development and debugging
 
 ## Development Notes
 
@@ -144,4 +151,7 @@ The app follows this user journey:
 - **Type Safety**: Maintain strict TypeScript configuration throughout
 - **Session Code Generation**: Must exclude '0' and 'o' characters for visual clarity
 - **Privacy-First**: Support anonymous voting modes with minimal data collection
-- **Real-time Architecture**: Backend API with WebSocket support for live collaboration
+- **Real-time Architecture**: Backend API with Server-Sent Events (SSE) for live collaboration
+- **Logging**: Winston-based logging with daily rotation and production optimization
+- **Database Schema**: PostgreSQL with tables for sessions, participants, votes, and rounds
+- **Error Handling**: Comprehensive error handling with graceful degradation
