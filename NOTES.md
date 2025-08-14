@@ -84,3 +84,171 @@ const activeParticipants = session.participants.filter(
 
 #### Priority
 Medium - Would improve user experience and admin visibility, but current `lastSeen` approach works adequately.
+
+## 🛡️ Security Best Practices - Preventing Credential Leaks
+
+### 1. **Git Hooks & Pre-commit Checks**
+
+Install tools that scan for secrets before commits:
+
+```bash
+# Install pre-commit
+npm install --save-dev @commitlint/config-conventional @commitlint/cli
+pip install pre-commit detect-secrets
+
+# Add to package.json scripts:
+"secrets-check": "detect-secrets scan --all-files",
+"pre-commit": "npm run secrets-check && npm run lint"
+```
+
+### 2. **Environment Variable Patterns**
+
+**✅ DO:**
+```bash
+# .env (gitignored)
+DATABASE_URL=postgres://real_user:real_pass@real_host/db
+
+# .env.example (committed)
+DATABASE_URL=postgresql://user:password@host:5432/database
+```
+
+**❌ DON'T:**
+```javascript
+// Never hardcode in source files
+const dbUrl = "postgres://user:pass@host/db"
+```
+
+### 3. **IDE/Editor Protection**
+
+Configure your editor to highlight potential secrets:
+
+```json
+// VS Code settings.json
+{
+  "files.watcherExclude": {
+    "**/.env": true
+  },
+  "search.exclude": {
+    "**/.env": true
+  }
+}
+```
+
+### 4. **Enhanced .gitignore**
+
+```gitignore
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.test
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# Logs with potential secrets
+*.log
+logs/
+```
+
+### 5. **Repository Security Tools**
+
+**GitHub Security Features:**
+- Enable "Secret scanning" in repository settings
+- Enable "Dependency scanning" 
+- Use GitHub's "Security" tab to monitor alerts
+
+**Third-party Tools:**
+```bash
+# GitLeaks - scan for secrets
+brew install gitleaks
+gitleaks detect --source .
+
+# TruffleHog - find secrets in git history  
+pip install truffleHog
+truffleHog --regex --entropy=False .
+```
+
+### 6. **Development Workflow**
+
+**Safe Environment Setup:**
+```bash
+# 1. Copy example file
+cp .env.example .env
+
+# 2. Edit with real values (file is gitignored)
+# 3. Never commit .env files
+# 4. Always use environment variables in code:
+const dbUrl = process.env.DATABASE_URL
+```
+
+### 7. **Code Review Checklist**
+
+Before any commit/PR:
+- [ ] No hardcoded passwords/URLs
+- [ ] All sensitive data uses environment variables
+- [ ] `.env` files are gitignored
+- [ ] Example files contain only placeholders
+- [ ] Run secrets scanning tools
+
+### 8. **Production Security**
+
+**Environment Variables in Production:**
+```bash
+# Vercel/Netlify - use dashboard
+# Docker - use secrets or env files outside repo
+# Local - use .env files (gitignored)
+```
+
+### 9. **Team Education**
+
+**Onboarding Checklist:**
+- [ ] Never commit real credentials
+- [ ] Always use `.env` files for local development
+- [ ] Understand `.gitignore` patterns
+- [ ] Know how to use environment variables
+- [ ] Install and use pre-commit hooks
+
+### 10. **Automated Protection**
+
+**GitHub Actions Workflow:**
+```yaml
+# .github/workflows/security.yml
+name: Security Scan
+on: [push, pull_request]
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run secret scan
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --all-files
+```
+
+### 🎯 **Quick Setup for Your Project**
+
+1. **Install pre-commit hooks:**
+```bash
+npm install --save-dev husky lint-staged
+npx husky add .husky/pre-commit "npm run lint && npm run secrets-check"
+```
+
+2. **Add to package.json:**
+```json
+{
+  "scripts": {
+    "secrets-check": "echo 'Checking for secrets...' && git diff --cached --name-only | xargs grep -l 'postgres://.*@.*' && exit 1 || echo 'No secrets found'"
+  }
+}
+```
+
+3. **Enable GitHub secret scanning** in your repository settings.
+
+The key is **layered security** - multiple tools and practices working together to catch secrets before they reach your repository.
