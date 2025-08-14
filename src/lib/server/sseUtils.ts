@@ -8,6 +8,10 @@ export const sessionConnections = new Map<string, Set<ReadableStreamDefaultContr
 // Key format: "sessionCode:playerName" -> controller
 export const participantConnections = new Map<string, ReadableStreamDefaultController>();
 
+// Optimization: Batch SSE updates to reduce server load
+const pendingUpdates = new Map<string, NodeJS.Timeout>();
+const UPDATE_BATCH_DELAY = 1000; // 1 second batch delay
+
 // Add participant connection tracking
 export function addParticipantConnection(
 	sessionCode: string,
@@ -17,6 +21,9 @@ export function addParticipantConnection(
 	const key = `${sessionCode}:${playerName}`;
 	participantConnections.set(key, controller);
 	console.log(`[SSE] Added participant connection: ${key}`);
+
+	// Trigger batched session update
+	batchSessionUpdate(sessionCode);
 }
 
 // Remove participant connection tracking
@@ -24,6 +31,9 @@ export function removeParticipantConnection(sessionCode: string, playerName: str
 	const key = `${sessionCode}:${playerName}`;
 	participantConnections.delete(key);
 	console.log(`[SSE] Removed participant connection: ${key}`);
+
+	// Trigger batched session update
+	batchSessionUpdate(sessionCode);
 }
 
 // Check if participant is connected via SSE
@@ -48,6 +58,25 @@ export function getSessionConnectionStatus(
 		...participant,
 		isConnected: participant.isHost || isParticipantConnected(sessionCode, participant.name)
 	}));
+}
+
+// Batch session updates to reduce SSE broadcast frequency
+export function batchSessionUpdate(sessionCode: string): void {
+	// Clear existing timeout for this session
+	const existingTimeout = pendingUpdates.get(sessionCode);
+	if (existingTimeout) {
+		clearTimeout(existingTimeout);
+	}
+
+	// Set new batched update
+	const timeout = setTimeout(() => {
+		broadcastSessionUpdate(sessionCode).catch((error) => {
+			console.error(`[SSE] Error in batched session update for ${sessionCode}:`, error);
+		});
+		pendingUpdates.delete(sessionCode);
+	}, UPDATE_BATCH_DELAY);
+
+	pendingUpdates.set(sessionCode, timeout);
 }
 
 // Function to broadcast updates to all connected clients in a session

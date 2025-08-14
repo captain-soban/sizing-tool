@@ -73,11 +73,12 @@ export class ParticipantModeService {
 				this.options.onVoteReset?.();
 			}
 
-			// Update server state
+			// Update server state - use immediate update for critical observer mode changes
 			await this.sessionClient.updateParticipant(
 				this.options.sessionCode,
 				this.options.playerName,
-				updates
+				updates,
+				true // true = immediate update, bypass batching
 			);
 
 			// Update local state

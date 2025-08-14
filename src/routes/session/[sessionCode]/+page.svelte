@@ -432,15 +432,22 @@
 	async function selectVote(vote: string) {
 		if (isObserver) return; // Observers cannot vote
 
+		// Immediate UI update for better UX
 		selectedVote = vote;
 
-		// Update server state
+		// Optimized server update - uses batching for better performance
 		if (sessionClient) {
 			try {
-				await sessionClient.updateParticipant(sessionCode, playerName, {
-					voted: true,
-					vote: vote
-				});
+				// Vote updates are batched and debounced (not immediate)
+				await sessionClient.updateParticipant(
+					sessionCode,
+					playerName,
+					{
+						voted: true,
+						vote: vote
+					},
+					false
+				); // false = use batching
 			} catch (error) {
 				console.error('[Session] Error selecting vote:', error);
 			}

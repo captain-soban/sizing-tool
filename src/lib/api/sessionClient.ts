@@ -14,6 +14,15 @@ export class SessionClient {
 	private eventSource: EventSource | null = null;
 	private updateCallbacks: ((session: SessionData) => void)[] = [];
 
+	// Optimization: Batching and debouncing for participant updates
+	private pendingUpdates = new Map<string, Partial<Participant>>();
+	private batchTimeout: NodeJS.Timeout | null = null;
+	private readonly BATCH_DELAY = 250; // ms - debounce participant updates
+	private readonly HEARTBEAT_INTERVAL = 60000; // ms - reduced from 30s to 60s
+
+	// Vote caching for immediate UI updates
+	private voteCache = new Map<string, { vote: string; timestamp: number }>();
+
 	// Create new session
 	async createSession(
 		hostName: string,
@@ -69,8 +78,41 @@ export class SessionClient {
 		return response.json();
 	}
 
-	// Update participant (vote, observer status, etc.)
+	// Update participant (vote, observer status, etc.) - OPTIMIZED
 	async updateParticipant(
+		sessionCode: string,
+		playerName: string,
+		updates: Partial<Participant>,
+		immediate = false
+	): Promise<SessionData | null> {
+		const key = `${sessionCode}-${playerName}`;
+
+		// For critical updates (observer mode, connection status), send immediately
+		if (immediate || updates.isObserver !== undefined || updates.isConnected !== undefined) {
+			return this.sendParticipantUpdate(sessionCode, playerName, updates);
+		}
+
+		// For votes and heartbeats, use batching
+		const existing = this.pendingUpdates.get(key) || {};
+		this.pendingUpdates.set(key, { ...existing, ...updates });
+
+		// Cache votes for immediate UI feedback
+		if (updates.vote !== undefined) {
+			this.voteCache.set(`${sessionCode}-${playerName}`, {
+				vote: updates.vote,
+				timestamp: Date.now()
+			});
+		}
+
+		// Debounce API calls
+		if (this.batchTimeout) clearTimeout(this.batchTimeout);
+		this.batchTimeout = setTimeout(() => this.flushPendingUpdates(), this.BATCH_DELAY);
+
+		return null; // No immediate response for batched updates
+	}
+
+	// Internal method to send actual participant update
+	private async sendParticipantUpdate(
 		sessionCode: string,
 		playerName: string,
 		updates: Partial<Participant>
@@ -90,6 +132,24 @@ export class SessionClient {
 		}
 
 		return response.json();
+	}
+
+	// Flush all pending participant updates
+	private async flushPendingUpdates(): Promise<void> {
+		if (this.pendingUpdates.size === 0) return;
+
+		const updates = Array.from(this.pendingUpdates.entries());
+		this.pendingUpdates.clear();
+
+		// Send all batched updates in parallel
+		const promises = updates.map(([key, updateData]) => {
+			const [sessionCode, playerName] = key.split('-', 2);
+			return this.sendParticipantUpdate(sessionCode, playerName, updateData).catch((error) => {
+				console.error(`[SessionClient] Failed to send batched update for ${key}:`, error);
+			});
+		});
+
+		await Promise.allSettled(promises);
 	}
 
 	// Remove participant from session (host only)
@@ -234,15 +294,35 @@ export class SessionClient {
 			this.eventSource.close();
 			this.eventSource = null;
 		}
+
+		// Clean up any pending updates
+		if (this.batchTimeout) {
+			clearTimeout(this.batchTimeout);
+			this.batchTimeout = null;
+		}
+		this.flushPendingUpdates().catch((error) => {
+			console.error('[SessionClient] Error flushing pending updates on disconnect:', error);
+		});
 	}
 
-	// Send heartbeat to keep participant active
+	// Send heartbeat to keep participant active - OPTIMIZED
 	async sendHeartbeat(sessionCode: string, playerName: string): Promise<void> {
 		try {
-			await this.updateParticipant(sessionCode, playerName, { lastSeen: Date.now() });
+			// Use batched update for heartbeats (non-critical)
+			await this.updateParticipant(sessionCode, playerName, { lastSeen: Date.now() }, false);
 		} catch (error) {
 			console.error('[SessionClient] Failed to send heartbeat:', error);
 		}
+	}
+
+	// Get cached vote for immediate UI feedback
+	getCachedVote(sessionCode: string, playerName: string): string | undefined {
+		const cached = this.voteCache.get(`${sessionCode}-${playerName}`);
+		if (cached && Date.now() - cached.timestamp < 5000) {
+			// 5 second cache
+			return cached.vote;
+		}
+		return undefined;
 	}
 
 	// Get voting rounds for a session

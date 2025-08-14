@@ -82,7 +82,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 					console.error(`[SSE] Error loading initial session data:`, error);
 				});
 
-			// Send periodic heartbeat
+			// Send periodic heartbeat - optimized frequency
 			const heartbeatInterval = setInterval(() => {
 				try {
 					controller.enqueue(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
@@ -91,7 +91,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 					clearInterval(heartbeatInterval);
 					sessionConnections.get(sessionCode)?.delete(controller);
 				}
-			}, 30000); // 30 seconds
+			}, 60000); // 60 seconds - reduced frequency for better performance
 
 			// Cleanup on connection close
 			const cleanup = () => {
