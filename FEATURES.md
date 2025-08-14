@@ -27,6 +27,9 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 - **Smart Name Persistence**: Remembers previously used names for returning users
 - **Participant Stats**: Display voting participation metrics and statistics
 - **Mode Toggle Component**: Dedicated UI component for switching participant modes
+- **Host Verification System**: Secure host identification and restoration capabilities
+- **Participant Management**: Host can remove disruptive participants from sessions
+- **Real-time Connection Status**: Live indicators showing participant online/offline status
 
 ### Voting System
 
@@ -46,7 +49,7 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 - **Vote Reveal**: Owner-controlled simultaneous reveal of all votes
 - **Average Calculation**: Automatic average calculation with manual override option
 - **Round Management**: Support for multiple voting rounds within a session
-- **Round Titles**: Optional descriptive titles for each voting round
+- **Round Titles**: Optional descriptive titles for each voting round (can be skipped)
 - **Vote History**: Tracking and display of previous round results
 
 ### UI Layout & Navigation
@@ -80,6 +83,8 @@ A planning poker app that helps an Agile or Scrum team estimate on a feature or 
 - **Automatic Cleanup**: Inactive participant and session cleanup
 - **Database Monitoring**: Development page showing database connection and table info
 - **Connection Pooling**: Optimized database connections for production scaling
+- **API Performance Optimization**: Request batching and debouncing for efficient updates
+- **Speed Insights Integration**: Production performance monitoring and analytics
 
 ## Future Enhancement Ideas
 

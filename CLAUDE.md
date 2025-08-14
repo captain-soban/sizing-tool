@@ -58,7 +58,7 @@ The app follows this user journey:
 
 - **Frontend State**: Built on Svelte 5's `$state` runes for reactive UI updates
 - **Session Persistence**: Real-time multi-user sessions with backend API
-- **Real-time Updates**: WebSocket or polling for live participant synchronization
+- **Real-time Updates**: Server-Sent Events (SSE) for live participant synchronization with connection status tracking
 - **Local Storage**: Used only for user preferences and session reconnection
 
 ### Component Architecture
@@ -79,10 +79,11 @@ The app follows this user journey:
 
 - **Frontend**: SvelteKit with Vercel adapter for serverless deployment
 - **Backend**: SvelteKit server routes for session management
-- **Real-time**: Server-Sent Events (SSE) for live updates
+- **Real-time**: Server-Sent Events (SSE) for live updates with API batching and debouncing
 - **Database**: Neon PostgreSQL (managed cloud database)
 - **Deployment**: Vercel platform with automatic HTTPS and CDN
 - **Production**: Serverless functions with connection pooling and auto-scaling
+- **Performance Monitoring**: Speed Insights integration for production analytics
 
 ### Session Management
 
@@ -100,6 +101,9 @@ The app follows this user journey:
 - **Participant Stats**: Display voting statistics and participation metrics
 - **Shareable Links**: Generate and share session links for easy participant access
 - **Round Management**: Support for multiple voting rounds within a session with optional titles
+- **Host Verification**: Secure host identification and restoration system
+- **Participant Management**: Host can remove disruptive participants from sessions
+- **Connection Status**: Real-time participant online/offline indicators
 
 ## Key Features & Business Logic
 
@@ -107,9 +111,10 @@ The app follows this user journey:
 
 - **Story Point Scales**: Configurable scales including Fibonacci (0-8, 1-8, 0-13), T-shirt sizes (S-XL), linear (1-8), and custom comma-delimited values
 - **Vote States**: Participants can be active voters or observers with visual indicators
-- **Vote Collection**: Animated icons show voting progress for each participant
+- **Vote Collection**: Animated icons show voting progress for each participant with connection status
 - **Vote Reveal**: Session owner controls simultaneous reveal showing individual votes and average
 - **Result Control**: Owner can accept average or change final estimate
+- **Round Descriptions**: Optional descriptive titles for voting rounds (can be skipped)
 
 ### Admin Dashboard
 
@@ -143,6 +148,8 @@ The app follows this user journey:
 - **Participant Mode Service**: Centralized service for managing observer/voter state transitions
 - **Round History**: Storage and retrieval of multiple voting rounds within sessions
 - **Database Monitoring**: Optional database information page for development and debugging
+- **Performance Optimization**: API request batching and debouncing for efficient real-time updates
+- **Host Authority**: Secure host verification system with participant removal capabilities
 
 ## Development Notes
 
@@ -151,7 +158,9 @@ The app follows this user journey:
 - **Type Safety**: Maintain strict TypeScript configuration throughout
 - **Session Code Generation**: Must exclude '0' and 'o' characters for visual clarity
 - **Privacy-First**: Support anonymous voting modes with minimal data collection
-- **Real-time Architecture**: Backend API with Server-Sent Events (SSE) for live collaboration
+- **Real-time Architecture**: Backend API with Server-Sent Events (SSE) for live collaboration with optimized batching
 - **Logging**: Winston-based logging with daily rotation and production optimization
 - **Database Schema**: PostgreSQL with tables for sessions, participants, votes, and rounds
 - **Error Handling**: Comprehensive error handling with graceful degradation
+- **Performance Monitoring**: Integrated Speed Insights for production performance tracking
+- **Host Management**: Secure host verification and participant management capabilities

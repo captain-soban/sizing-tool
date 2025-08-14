@@ -28,7 +28,17 @@ vite.config.ts.timestamp-*
 
 # Markdown files
 *.md
+!README.md
 
 # Log files
 logs/*.log
 logs/*.json
+
+# Editor-specific files
+.vscode/
+
+# npm config
+.npmrc
+
+# Custom/Backup folders
+--version/

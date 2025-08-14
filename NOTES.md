@@ -27,12 +27,21 @@ Add more notes as your project evolves.
 ✅ **Round Management**: Multiple voting rounds with optional titles  
 ✅ **Admin Dashboard**: Session monitoring and management interface  
 ✅ **Database Monitoring**: Development debug page for database info  
+✅ **Host Verification System**: Secure host identification and restoration  
+✅ **Participant Removal**: Host can remove disruptive participants  
+✅ **Real-time Connection Status**: Live participant connection indicators  
+✅ **API Performance Optimization**: Batching and debouncing for smooth updates  
+✅ **Speed Insights Integration**: Performance monitoring for production
 
 ## Current TODO
 1. ✅ Username required - COMPLETED
 2. Help icon and text for each page  
 3. ✅ Redesign recent sessions - COMPLETED (separate card layout)
 4. ✅ New round implementation - COMPLETED (with optional titles)
+5. ✅ Host verification system - COMPLETED (secure host identification)
+6. ✅ Participant removal feature - COMPLETED (host can remove participants)
+7. ✅ Real-time connection status - COMPLETED (live participant indicators)
+8. ✅ API performance optimization - COMPLETED (batching and debouncing)
 
 ### TODO: Implement isConnected Field Usage
 
