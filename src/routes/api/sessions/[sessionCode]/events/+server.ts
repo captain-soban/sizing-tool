@@ -91,7 +91,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 					clearInterval(heartbeatInterval);
 					sessionConnections.get(sessionCode)?.delete(controller);
 				}
-			}, 60000); // 60 seconds - reduced frequency for better performance
+			}, 30000); // 30 seconds - optimized frequency to detect dead connections
 
 			// Cleanup on connection close
 			const cleanup = () => {
@@ -111,7 +111,11 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
 				// Remove participant connection tracking
 				if (playerName) {
-					removeParticipantConnection(sessionCode, playerName);
+					removeParticipantConnection(
+						sessionCode,
+						playerName,
+						controller as ReadableStreamDefaultController
+					);
 				}
 			};
 

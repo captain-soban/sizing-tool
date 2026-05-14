@@ -161,10 +161,21 @@
 			if (!document.hidden && sessionClient) {
 				// Reconnect to real-time updates if needed
 				sessionClient.connectToRealtime(sessionCode, playerName);
+				// Force immediate heartbeat ping to update lastSeen in DB instantly
+				sessionClient.sendHeartbeat(sessionCode, playerName, true);
+			}
+		};
+
+		// Handle network reconnects (e.g. waking from sleep)
+		const handleOnline = () => {
+			if (!document.hidden && sessionClient) {
+				sessionClient.connectToRealtime(sessionCode, playerName);
+				sessionClient.sendHeartbeat(sessionCode, playerName, true);
 			}
 		};
 
 		document.addEventListener('visibilitychange', handleVisibilityChange);
+		window.addEventListener('online', handleOnline);
 
 		// Add keyboard shortcuts
 		const handleKeyPress = (e: KeyboardEvent) => {
@@ -202,6 +213,7 @@
 
 		return () => {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			window.removeEventListener('online', handleOnline);
 			document.removeEventListener('keydown', handleKeyPress);
 		};
 	});
@@ -247,7 +259,7 @@
 				if (sessionClient) {
 					sessionClient.sendHeartbeat(sessionCode, playerName);
 				}
-			}, 60000); // Send heartbeat every 60 seconds (reduced from 5 seconds)
+			}, 30000); // Send heartbeat every 30 seconds
 		} catch (error) {
 			console.error('[Session] Error joining session:', error);
 			goto('/');
@@ -383,7 +395,7 @@
 				if (sessionClient) {
 					sessionClient.sendHeartbeat(sessionCode, playerName);
 				}
-			}, 60000); // Send heartbeat every 60 seconds (reduced from 5 seconds)
+			}, 30000); // Send heartbeat every 30 seconds
 		} catch (error) {
 			console.error('[Session] Error setting up session after join:', error);
 			goto('/');
@@ -1006,8 +1018,7 @@
 						<div class="flex flex-col items-center">
 							<!-- Participant Card -->
 							<Card
-								class="work-area relative w-24 sm:w-28 {!participant.isHost &&
-								participant.isConnected === false
+								class="work-area relative w-24 sm:w-28 {participant.isConnected === false
 									? 'bg-gray-50 opacity-75'
 									: ''}"
 							>
@@ -1043,7 +1054,7 @@
 													<Eye class="h-2 w-2" />
 												</span>
 											{/if}
-											{#if !participant.isHost && participant.isConnected === false}
+											{#if participant.isConnected === false}
 												<span
 													class="flex items-center rounded bg-gray-400 px-1 py-0.5 text-[8px] font-medium text-white sm:text-[9px]"
 													title="Disconnected"
@@ -1056,7 +1067,7 @@
 
 									<!-- Vote Status Indicator -->
 									<div class="flex justify-center">
-										{#if !participant.isHost && participant.isConnected === false}
+										{#if participant.isConnected === false}
 											<div
 												class="flex items-center gap-1 rounded bg-gray-300 px-1.5 py-0.5 text-[9px] font-medium text-gray-700 sm:px-2 sm:py-1 sm:text-[10px]"
 											>

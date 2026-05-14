@@ -27,8 +27,21 @@ export function addParticipantConnection(
 }
 
 // Remove participant connection tracking
-export function removeParticipantConnection(sessionCode: string, playerName: string): void {
+export function removeParticipantConnection(
+	sessionCode: string,
+	playerName: string,
+	controllerToRemove?: ReadableStreamDefaultController
+): void {
 	const key = `${sessionCode}:${playerName}`;
+	const currentController = participantConnections.get(key);
+
+	if (controllerToRemove && currentController !== controllerToRemove) {
+		console.log(
+			`[SSE] Skipped removing participant connection for ${key} (controller mismatch - likely reconnected)`
+		);
+		return;
+	}
+
 	participantConnections.delete(key);
 	console.log(`[SSE] Removed participant connection: ${key}`);
 
@@ -54,10 +67,20 @@ export function getSessionConnectionStatus(
 	participants: Participant[],
 	sessionCode: string
 ): Participant[] {
-	return participants.map((participant) => ({
-		...participant,
-		isConnected: participant.isHost || isParticipantConnected(sessionCode, participant.name)
-	}));
+	const now = Date.now();
+	const GRACE_PERIOD = 90000; // 90 seconds grace period for background tab throttling
+
+	return participants.map((participant) => {
+		const isSseConnected = isParticipantConnected(sessionCode, participant.name);
+		const isRecentlySeen = participant.lastSeen
+			? now - participant.lastSeen <= GRACE_PERIOD
+			: false;
+
+		return {
+			...participant,
+			isConnected: isSseConnected && isRecentlySeen
+		};
+	});
 }
 
 // Batch session updates to reduce SSE broadcast frequency

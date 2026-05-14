@@ -18,7 +18,7 @@ export class SessionClient {
 	private pendingUpdates = new Map<string, Partial<Participant>>();
 	private batchTimeout: NodeJS.Timeout | null = null;
 	private readonly BATCH_DELAY = 250; // ms - debounce participant updates
-	private readonly HEARTBEAT_INTERVAL = 60000; // ms - reduced from 30s to 60s
+	private readonly HEARTBEAT_INTERVAL = 30000; // ms - reduced from 60s to 30s
 
 	// Vote caching for immediate UI updates
 	private voteCache = new Map<string, { vote: string; timestamp: number }>();
@@ -306,10 +306,11 @@ export class SessionClient {
 	}
 
 	// Send heartbeat to keep participant active - OPTIMIZED
-	async sendHeartbeat(sessionCode: string, playerName: string): Promise<void> {
+	async sendHeartbeat(sessionCode: string, playerName: string, immediate = false): Promise<void> {
 		try {
-			// Use batched update for heartbeats (non-critical)
-			await this.updateParticipant(sessionCode, playerName, { lastSeen: Date.now() }, false);
+			// Use batched update for heartbeats by default, or immediate if requested (e.g. returning to tab)
+			// No need to send lastSeen - server now handles this automatically with NOW()
+			await this.updateParticipant(sessionCode, playerName, {}, immediate);
 		} catch (error) {
 			console.error('[SessionClient] Failed to send heartbeat:', error);
 		}

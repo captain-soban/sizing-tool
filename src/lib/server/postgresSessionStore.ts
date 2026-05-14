@@ -282,12 +282,9 @@ export class PostgresSessionStore {
 				setClauses.push(`is_observer = $${paramCount++}`);
 				values.push(updates.isObserver);
 			}
-			if (updates.lastSeen !== undefined) {
-				setClauses.push(`last_seen = to_timestamp($${paramCount++} / 1000.0)`);
-				values.push(updates.lastSeen);
-			} else {
-				setClauses.push(`last_seen = NOW()`);
-			}
+
+			// Always update last_seen on any activity using server time
+			setClauses.push(`last_seen = NOW()`);
 
 			if (setClauses.length === 0) {
 				return await this.getSession(sessionCode);

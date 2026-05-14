@@ -33,12 +33,16 @@
 
 	const displayText = $derived(
 		(() => {
-			const { total, voting, observing } = stats;
+			const { total, voting, observing, disconnected } = stats;
 
 			let text = `👥 ${total} participant${total !== 1 ? 's' : ''}`;
 
 			if (observing > 0) {
 				text += ` (${voting} voting)`;
+			}
+
+			if (disconnected > 0) {
+				text += ` • ${disconnected} offline`;
 			}
 
 			return text;

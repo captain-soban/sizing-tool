@@ -154,20 +154,22 @@ export class ParticipantModeService {
 	}
 
 	/**
-	 * Counts voting vs observing participants
+	 * Counts voting vs observing participants, explicitly separating disconnected users
 	 */
 	static getParticipantCounts(participants: Participant[]): {
 		total: number;
 		voting: number;
 		observing: number;
+		disconnected: number;
 	} {
-		const total = participants.length;
-		const voting = participants.filter(
-			(p) => !p.isObserver && (p.isHost || p.isConnected !== false)
-		).length;
+		const connectedParticipants = participants.filter((p) => p.isHost || p.isConnected !== false);
+		const disconnected = participants.length - connectedParticipants.length;
+
+		const total = connectedParticipants.length;
+		const voting = connectedParticipants.filter((p) => !p.isObserver).length;
 		const observing = total - voting;
 
-		return { total, voting, observing };
+		return { total, voting, observing, disconnected };
 	}
 
 	/**

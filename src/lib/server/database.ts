@@ -190,10 +190,10 @@ export async function cleanupDatabase() {
 	const pool = getPool();
 
 	try {
-		// Remove participants inactive for more than 30 seconds (but never remove hosts)
+		// Remove participants inactive for more than 10 minutes (but never remove hosts)
 		const inactiveParticipants = await pool.query(`
 			DELETE FROM participants 
-			WHERE last_seen < NOW() - INTERVAL '30 seconds'
+			WHERE last_seen < NOW() - INTERVAL '10 minutes'
 			AND is_host = FALSE
 			RETURNING session_code, name
 		`);
