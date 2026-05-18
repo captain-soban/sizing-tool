@@ -76,6 +76,8 @@
 	let isJoiningViaLink = $state(false);
 	let participantToRemove = $state<string | null>(null);
 	let showRemoveConfirmation = $state(false);
+	let isRevealingVotes = $state(false);
+	let isAcceptingEstimate = $state(false);
 	let roundService: RoundService;
 	let participantModeService: ParticipantModeService;
 	let shareableLinkService: ShareableLinkService;
@@ -497,40 +499,70 @@
 	}
 
 	async function revealVotes() {
-		if (!isHost) return;
+		if (!isHost || isRevealingVotes) return;
+
+		const previousVotesRevealed = votesRevealed;
+		const previousVoteAverage = voteAverage;
+		const optimisticAverage = calculateVisibleVoteAverage();
+
+		isRevealingVotes = true;
+		votesRevealed = true;
+		voteAverage = optimisticAverage;
 
 		// The server calculates the average from persisted votes so reconnects and disconnects
 		// cannot cause the host's local state to drop a valid vote.
 		if (sessionClient) {
 			try {
-				await sessionClient.updateVotingState(
+				const updatedSession = await sessionClient.updateVotingState(
 					sessionCode,
 					{
 						votesRevealed: true
 					},
 					playerName
 				);
+				updateFromSessionData(updatedSession);
 			} catch (error) {
+				votesRevealed = previousVotesRevealed;
+				voteAverage = previousVoteAverage;
 				console.error('[Session] Error revealing votes:', error);
+			} finally {
+				isRevealingVotes = false;
 			}
 		}
 	}
 
 	async function acceptEstimate() {
-		if (!isHost) return;
+		if (!voteAverage) return;
+		await updateFinalEstimate(voteAverage);
+	}
+
+	async function updateFinalEstimate(nextFinalEstimate: string) {
+		if (!isHost || isAcceptingEstimate) return;
+
+		const previousFinalEstimate = finalEstimate;
+		const previousVotingInProgress = votingInProgress;
+
+		isAcceptingEstimate = true;
+		finalEstimate = nextFinalEstimate;
+		votingInProgress = false;
 
 		if (sessionClient) {
 			try {
-				await sessionClient.updateVotingState(
+				const updatedSession = await sessionClient.updateVotingState(
 					sessionCode,
 					{
-						finalEstimate: voteAverage,
+						finalEstimate: nextFinalEstimate,
 						votingInProgress: false
 					},
 					playerName
 				);
+				updateFromSessionData(updatedSession);
 			} catch (error) {
-				console.error('[Session] Error accepting estimate:', error);
+				finalEstimate = previousFinalEstimate;
+				votingInProgress = previousVotingInProgress;
+				console.error('[Session] Error updating final estimate:', error);
+			} finally {
+				isAcceptingEstimate = false;
 			}
 		}
 	}
@@ -699,6 +731,22 @@
 	// Check if all non-observer participants have voted
 	function allParticipantsVoted(): boolean {
 		return ParticipantModeService.allVotingParticipantsHaveVoted(participants);
+	}
+
+	function calculateVisibleVoteAverage(): string {
+		const votes = participants
+			.filter(
+				(participant) =>
+					!participant.isObserver &&
+					participant.vote &&
+					participant.vote !== '?' &&
+					!Number.isNaN(Number.parseFloat(participant.vote))
+			)
+			.map((participant) => Number.parseFloat(participant.vote!));
+
+		return votes.length > 0
+			? (votes.reduce((sum, vote) => sum + vote, 0) / votes.length).toFixed(1)
+			: '';
 	}
 
 	// Remove participant functions
@@ -880,11 +928,12 @@
 												<div class="flex justify-center gap-2">
 													<Button
 														onclick={acceptEstimate}
+														disabled={isAcceptingEstimate}
 														class="bg-green-500 px-3 text-xs text-white hover:bg-green-600 sm:px-4 sm:text-sm"
 														size="sm"
 													>
 														<Check class="mr-1 h-3 w-3" />
-														Accept {voteAverage}
+														{isAcceptingEstimate ? 'Accepting...' : `Accept ${voteAverage}`}
 													</Button>
 												</div>
 												<div class="flex flex-wrap justify-center gap-1 sm:gap-2">
@@ -900,21 +949,11 @@
 													<Button
 														onclick={async () => {
 															const customValue = prompt('Enter custom estimate:', voteAverage);
-															if (customValue && customValue.trim() && sessionClient) {
-																try {
-																	await sessionClient.updateVotingState(
-																		sessionCode,
-																		{
-																			finalEstimate: customValue.trim(),
-																			votingInProgress: false
-																		},
-																		playerName
-																	);
-																} catch (error) {
-																	console.error('[Session] Error saving custom estimate:', error);
-																}
+															if (customValue && customValue.trim()) {
+																await updateFinalEstimate(customValue.trim());
 															}
 														}}
+														disabled={isAcceptingEstimate}
 														variant="outline"
 														size="sm"
 														class="btn-poker-gray text-xs sm:text-sm"
@@ -936,21 +975,9 @@
 												{#if isHost}
 													<Button
 														onclick={async () => {
-															if (sessionClient) {
-																try {
-																	await sessionClient.updateVotingState(
-																		sessionCode,
-																		{
-																			finalEstimate: '',
-																			votingInProgress: false
-																		},
-																		playerName
-																	);
-																} catch (error) {
-																	console.error('[Session] Error resetting final estimate:', error);
-																}
-															}
+															await updateFinalEstimate('');
 														}}
+														disabled={isAcceptingEstimate}
 														variant="outline"
 														size="sm"
 														class="mt-2 text-xs"
@@ -976,13 +1003,13 @@
 											<div class="flex flex-wrap justify-center gap-2">
 												<Button
 													onclick={revealVotes}
-													disabled={!allParticipantsVoted()}
-													class={allParticipantsVoted()
+													disabled={!allParticipantsVoted() || isRevealingVotes}
+													class={allParticipantsVoted() && !isRevealingVotes
 														? 'bg-poker-red hover:bg-poker-red/90'
 														: 'cursor-not-allowed bg-gray-400'}
 												>
 													<Theater class="mr-1 h-4 w-4" />
-													Reveal Votes
+													{isRevealingVotes ? 'Revealing...' : 'Reveal Votes'}
 												</Button>
 												<Button
 													onclick={startNewVoting}
