@@ -251,9 +251,9 @@
 												</div>
 												<div class="flex items-center space-x-2 text-xs text-gray-500">
 													<span>Code: {recentSession.sessionCode}</span>
-													<span>•</span>
+													<span>&bull;</span>
 													<span>as {recentSession.playerName}</span>
-													<span>•</span>
+													<span>&bull;</span>
 													<span>{formatLastAccessed(recentSession.lastAccessed)}</span>
 												</div>
 											</div>

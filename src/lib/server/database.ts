@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { dev } from '$app/environment';
+import { building, dev } from '$app/environment';
 import { log } from './logger.js';
 import './consoleCapture.js'; // Capture console logs to file
 
@@ -226,7 +226,7 @@ export async function closeDatabase() {
 }
 
 // Initialize database on module load
-if (typeof window === 'undefined') {
+if (typeof window === 'undefined' && !building) {
 	// Only run on server side
 	initDatabase().catch((error) => {
 		log.databaseError('Failed to initialize', error);
