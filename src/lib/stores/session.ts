@@ -1,7 +1,7 @@
 export interface Participant {
 	name: string;
 	voted: boolean;
-	vote?: string;
+	vote?: string | null;
 	isHost: boolean;
 	isObserver?: boolean;
 	lastSeen?: number;

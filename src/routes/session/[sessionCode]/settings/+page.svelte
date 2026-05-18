@@ -16,6 +16,7 @@
 	let selectedScale = $state('fibonacci_0_8');
 	let customScale = $state('');
 	let isHost = $state(false);
+	let playerName = $state('');
 	let sessionClient: SessionClient;
 	let originalTitle = $state('');
 
@@ -30,6 +31,7 @@
 		}
 
 		isHost = currentSession.isHost;
+		playerName = currentSession.playerName;
 		sessionClient = new SessionClient();
 
 		try {
@@ -85,7 +87,7 @@
 		try {
 			// Update session title on server if it changed
 			if (isHost && sessionTitle !== originalTitle && sessionClient) {
-				await sessionClient.updateSessionTitle(sessionCode, sessionTitle);
+				await sessionClient.updateSessionTitle(sessionCode, sessionTitle, playerName);
 			}
 
 			// Update story point scale on server if host
@@ -103,7 +105,7 @@
 				}
 
 				if (scaleArray && scaleArray.length > 0) {
-					await sessionClient.updateStoryPointScale(sessionCode, scaleArray);
+					await sessionClient.updateStoryPointScale(sessionCode, scaleArray, playerName);
 				}
 			}
 

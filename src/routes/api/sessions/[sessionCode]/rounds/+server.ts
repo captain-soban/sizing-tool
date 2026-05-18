@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { getPool } from '$lib/server/database.js';
 import { log } from '$lib/server/logger.js';
+import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
 import type { RequestHandler } from './$types.js';
 
 // GET /api/sessions/[sessionCode]/rounds - Get all rounds for a session
@@ -69,7 +70,24 @@ export const POST: RequestHandler = async ({ request, params }) => {
 	const pool = getPool();
 
 	try {
-		const { roundNumber, description, votes, voteAverage, finalEstimate } = await request.json();
+		const {
+			roundNumber,
+			description,
+			votes,
+			voteAverage,
+			finalEstimate,
+			hostUserId,
+			hostPlayerName
+		} = await request.json();
+
+		const isHost = await PostgresSessionStore.isSessionHost(
+			sessionCode,
+			hostUserId,
+			hostPlayerName
+		);
+		if (!isHost) {
+			return json({ error: 'Host authorization required' }, { status: 403 });
+		}
 
 		// Start transaction
 		const client = await pool.connect();

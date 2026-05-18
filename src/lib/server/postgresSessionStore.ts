@@ -266,7 +266,7 @@ export class PostgresSessionStore {
 
 		try {
 			const setClauses: string[] = [];
-			const values: (boolean | string | number)[] = [];
+			const values: (boolean | string | number | null)[] = [];
 			let paramCount = 1;
 
 			// Build dynamic update query
@@ -274,13 +274,22 @@ export class PostgresSessionStore {
 				setClauses.push(`voted = $${paramCount++}`);
 				values.push(updates.voted);
 			}
-			if (updates.vote !== undefined) {
+			if ('vote' in updates) {
 				setClauses.push(`vote = $${paramCount++}`);
-				values.push(updates.vote);
+				values.push(updates.vote ?? null);
 			}
 			if (updates.isObserver !== undefined) {
 				setClauses.push(`is_observer = $${paramCount++}`);
 				values.push(updates.isObserver);
+
+				if (updates.isObserver) {
+					if (updates.voted === undefined) {
+						setClauses.push(`voted = FALSE`);
+					}
+					if (!('vote' in updates)) {
+						setClauses.push(`vote = NULL`);
+					}
+				}
 			}
 
 			// Always update last_seen on any activity using server time
@@ -375,6 +384,34 @@ export class PostgresSessionStore {
 		} catch (error) {
 			console.error(`[PostgresSessionStore] Error updating voting state:`, error);
 			return null;
+		}
+	}
+
+	static async isSessionHost(
+		sessionCode: string,
+		userId?: string,
+		playerName?: string
+	): Promise<boolean> {
+		if (!userId && !playerName) return false;
+
+		const pool = getPool();
+
+		try {
+			const hostResult = await pool.query(
+				`SELECT 1 FROM participants 
+				 WHERE session_code = $1
+				 AND is_host = TRUE
+				 AND (
+					($2::varchar IS NOT NULL AND user_id = $2)
+					OR ($2::varchar IS NULL AND $3::varchar IS NOT NULL AND name = $3)
+				 )`,
+				[sessionCode, userId || null, playerName || null]
+			);
+
+			return hostResult.rows.length > 0;
+		} catch (error) {
+			console.error(`[PostgresSessionStore] Error checking session host:`, error);
+			return false;
 		}
 	}
 

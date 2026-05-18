@@ -8,16 +8,6 @@ import {
 import { performLazyCleanup } from '$lib/server/lazyCleanup';
 import type { RequestHandler } from './$types';
 
-// Extended controller type with cleanup function
-interface ExtendedController extends ReadableStreamDefaultController {
-	cleanup?: () => void;
-}
-
-// Extended stream type with cleanup function
-interface ExtendedStream {
-	cleanup?: () => void;
-}
-
 // GET /api/sessions/[sessionCode]/events - Server-Sent Events endpoint
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { sessionCode } = params;
@@ -33,6 +23,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	if (!session) {
 		return new Response('Session not found', { status: 404 });
 	}
+
+	let cleanupConnection: (() => void) | null = null;
 
 	const stream = new ReadableStream({
 		start(controller) {
@@ -119,16 +111,12 @@ export const GET: RequestHandler = async ({ params, url }) => {
 				}
 			};
 
-			// Store cleanup function for later use
-			(controller as ExtendedController).cleanup = cleanup;
+			cleanupConnection = cleanup;
 		},
 
 		cancel() {
-			// Call cleanup when stream is cancelled
-			const cleanupFn = (this as ExtendedStream).cleanup;
-			if (cleanupFn) {
-				cleanupFn();
-			}
+			cleanupConnection?.();
+			cleanupConnection = null;
 		}
 	});
 

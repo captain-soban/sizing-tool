@@ -4,9 +4,19 @@ import { broadcastSessionUpdate } from '$lib/server/sseUtils';
 import type { RequestHandler } from './$types';
 
 // POST /api/sessions/[sessionCode]/voting/reset - Reset votes and start new voting
-export const POST: RequestHandler = async ({ params }) => {
+export const POST: RequestHandler = async ({ params, request }) => {
 	try {
 		const { sessionCode } = params;
+		const { hostUserId, hostPlayerName } = await request.json().catch(() => ({}));
+
+		const isHost = await PostgresSessionStore.isSessionHost(
+			sessionCode,
+			hostUserId,
+			hostPlayerName
+		);
+		if (!isHost) {
+			return json({ error: 'Host authorization required' }, { status: 403 });
+		}
 
 		const session = await PostgresSessionStore.resetVotes(sessionCode);
 

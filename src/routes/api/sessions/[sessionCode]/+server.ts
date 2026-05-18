@@ -41,6 +41,16 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		});
 		const { sessionCode } = params;
 		const updates = await request.json();
+		const { hostUserId, hostPlayerName } = updates;
+
+		const isHost = await PostgresSessionStore.isSessionHost(
+			sessionCode,
+			hostUserId,
+			hostPlayerName
+		);
+		if (!isHost) {
+			return json({ error: 'Host authorization required' }, { status: 403 });
+		}
 
 		let session = null;
 

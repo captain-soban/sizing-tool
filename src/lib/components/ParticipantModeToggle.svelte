@@ -4,6 +4,7 @@
 
 	interface Props {
 		isObserver: boolean;
+		isActiveVoting?: boolean;
 		isLoading?: boolean;
 		disabled?: boolean;
 		onToggle: () => Promise<void> | void;
@@ -13,6 +14,7 @@
 
 	let {
 		isObserver = false,
+		isActiveVoting = false,
 		isLoading = false,
 		disabled = false,
 		onToggle,
@@ -49,7 +51,35 @@
 		return baseClasses;
 	});
 
-	let buttonText = $derived(isToggling ? 'Switching...' : isObserver ? 'Observer' : 'Participant');
+	let buttonText = $derived(
+		isToggling
+			? 'Switching...'
+			: isActiveVoting
+				? isObserver
+					? 'Join Vote'
+					: 'Withdraw'
+				: isObserver
+					? 'Observer'
+					: 'Participant'
+	);
+
+	let toggleTitle = $derived(
+		isActiveVoting
+			? isObserver
+				? 'Join this voting round as a participant'
+				: 'Withdraw from this voting round and observe'
+			: isObserver
+				? 'Switch to participant mode for upcoming rounds'
+				: 'Switch to observer mode for upcoming rounds'
+	);
+
+	let toggleAriaLabel = $derived(
+		isActiveVoting
+			? isObserver
+				? 'Join this voting round as a participant'
+				: 'Withdraw from this voting round and observe'
+			: `Toggle between participant and observer mode. Currently ${isObserver ? 'observing' : 'participating'}`
+	);
 
 	let IconComponent = $derived(isObserver ? Eye : Vote);
 </script>
@@ -60,8 +90,8 @@
 	onclick={handleToggle}
 	disabled={disabled || isLoading || isToggling}
 	class={buttonClass}
-	aria-label={`Toggle between participant and observer mode. Currently ${isObserver ? 'observing' : 'participating'}`}
-	title={`Click to switch to ${isObserver ? 'participant' : 'observer'} mode`}
+	aria-label={toggleAriaLabel}
+	title={toggleTitle}
 >
 	<IconComponent class="mr-1 h-4 w-4" />
 	{buttonText}

@@ -15,6 +15,10 @@ export interface ParticipantModeOptions {
 	onVoteReset?: () => void;
 }
 
+export interface ToggleObserverModeOptions {
+	clearVote?: boolean;
+}
+
 /**
  * Service for managing participant/observer mode functionality
  */
@@ -55,7 +59,10 @@ export class ParticipantModeService {
 	/**
 	 * Toggles between participant and observer mode
 	 */
-	async toggleObserverMode(currentState: ParticipantModeState): Promise<ParticipantModeState> {
+	async toggleObserverMode(
+		currentState: ParticipantModeState,
+		options: ToggleObserverModeOptions = {}
+	): Promise<ParticipantModeState> {
 		const newIsObserver = !currentState.isObserver;
 
 		try {
@@ -65,9 +72,9 @@ export class ParticipantModeService {
 			};
 
 			// Clear vote if becoming observer
-			if (newIsObserver) {
+			if (newIsObserver && options.clearVote) {
 				updates.voted = false;
-				updates.vote = undefined;
+				updates.vote = null;
 
 				// Notify that vote should be reset in UI
 				this.options.onVoteReset?.();
@@ -142,15 +149,14 @@ export class ParticipantModeService {
 	 * Determines if participant can vote based on observer status and connection
 	 */
 	static canParticipantVote(participant: Participant): boolean {
-		return !participant.isObserver && (participant.isHost || participant.isConnected !== false);
+		return !participant.isObserver && (participant.isConnected !== false || participant.voted);
 	}
 
 	/**
 	 * Filters participants to only voting participants (non-observers and connected)
-	 * Note: Hosts are always included regardless of connection status to maintain session control
 	 */
 	static getVotingParticipants(participants: Participant[]): Participant[] {
-		return participants.filter((p) => !p.isObserver && (p.isHost || p.isConnected !== false));
+		return participants.filter((p) => this.canParticipantVote(p));
 	}
 
 	/**
@@ -162,7 +168,7 @@ export class ParticipantModeService {
 		observing: number;
 		disconnected: number;
 	} {
-		const connectedParticipants = participants.filter((p) => p.isHost || p.isConnected !== false);
+		const connectedParticipants = participants.filter((p) => p.isConnected !== false);
 		const disconnected = participants.length - connectedParticipants.length;
 
 		const total = connectedParticipants.length;
