@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Participant } from '$lib/stores/session';
 	import { ParticipantModeService } from '$lib/services/participantModeService';
+	import { Users } from '@lucide/svelte';
 
 	interface Props {
 		participants: Participant[];
@@ -35,14 +36,14 @@
 		(() => {
 			const { total, voting, observing, disconnected } = stats;
 
-			let text = `👥 ${total} participant${total !== 1 ? 's' : ''}`;
+			let text = `${total} online`;
 
 			if (observing > 0) {
 				text += ` (${voting} voting)`;
 			}
 
 			if (disconnected > 0) {
-				text += ` • ${disconnected} offline`;
+				text += ` - ${disconnected} offline`;
 			}
 
 			return text;
@@ -51,13 +52,14 @@
 </script>
 
 <div class={`flex items-center gap-2 text-sm ${className}`}>
+	<Users class="h-3.5 w-3.5 text-gray-500" />
 	<span class="text-gray-600">
 		{displayText}
 	</span>
 
 	{#if showVotingProgress && votingProgress && votingProgress.total > 0}
 		<span class="text-gray-500">
-			• {votingProgress.voted} / {votingProgress.total} voted
+			&bull; {votingProgress.voted} / {votingProgress.total} voted
 			{#if votingProgress.percentage < 100}
 				<span class="text-xs">({votingProgress.percentage}%)</span>
 			{/if}

@@ -21,7 +21,8 @@ export class RoundService {
 		currentRoundDescription: string,
 		participants: Participant[],
 		voteAverage: string,
-		finalEstimate: string
+		finalEstimate: string,
+		hostPlayerName?: string
 	): Promise<VotingRound> {
 		// Collect votes from current participants
 		const votes: { [key: string]: string } = {};
@@ -38,7 +39,8 @@ export class RoundService {
 			currentRoundDescription,
 			votes,
 			voteAverage,
-			finalEstimate
+			finalEstimate,
+			hostPlayerName
 		);
 
 		// Return round data for local state
@@ -58,16 +60,21 @@ export class RoundService {
 	async startNewRound(
 		sessionCode: string,
 		newRoundNumber: number,
-		description: string
+		description: string,
+		hostPlayerName?: string
 	): Promise<void> {
 		// Reset votes and start new round
-		await this.sessionClient.resetVotes(sessionCode);
+		await this.sessionClient.resetVotes(sessionCode, hostPlayerName);
 
 		// Update current round info for all participants
-		await this.sessionClient.updateVotingState(sessionCode, {
-			currentRound: newRoundNumber,
-			currentRoundDescription: description
-		});
+		await this.sessionClient.updateVotingState(
+			sessionCode,
+			{
+				currentRound: newRoundNumber,
+				currentRoundDescription: description
+			},
+			hostPlayerName
+		);
 	}
 
 	/**
@@ -80,7 +87,8 @@ export class RoundService {
 		participants: Participant[],
 		voteAverage: string,
 		finalEstimate: string,
-		newRoundDescription: string
+		newRoundDescription: string,
+		hostPlayerName?: string
 	): Promise<{
 		completedRound: VotingRound;
 		newRoundNumber: number;
@@ -92,12 +100,13 @@ export class RoundService {
 			currentRoundDescription,
 			participants,
 			voteAverage,
-			finalEstimate
+			finalEstimate,
+			hostPlayerName
 		);
 
 		// Start new round
 		const newRoundNumber = currentRound + 1;
-		await this.startNewRound(sessionCode, newRoundNumber, newRoundDescription);
+		await this.startNewRound(sessionCode, newRoundNumber, newRoundDescription, hostPlayerName);
 
 		return {
 			completedRound,

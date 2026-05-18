@@ -33,9 +33,19 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 };
 
 // DELETE /api/sessions/[sessionCode]/participants/[playerName] - Remove participant
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ params, request }) => {
 	try {
 		const { sessionCode, playerName } = params;
+		const { hostUserId, hostPlayerName } = await request.json().catch(() => ({}));
+
+		const isHost = await PostgresSessionStore.isSessionHost(
+			sessionCode,
+			hostUserId,
+			hostPlayerName
+		);
+		if (!isHost) {
+			return json({ error: 'Host authorization required' }, { status: 403 });
+		}
 
 		const session = await PostgresSessionStore.removeParticipant(sessionCode, playerName);
 

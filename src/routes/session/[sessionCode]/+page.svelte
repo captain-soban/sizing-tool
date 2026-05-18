@@ -40,7 +40,8 @@
 		Rocket,
 		Lightbulb,
 		CheckCircle,
-		UserMinus
+		UserMinus,
+		WifiOff
 	} from '@lucide/svelte';
 
 	const sessionCode = $page.params.sessionCode!;
@@ -424,7 +425,9 @@
 		};
 
 		try {
-			await participantModeService.toggleObserverMode(currentState);
+			await participantModeService.toggleObserverMode(currentState, {
+				clearVote: votingInProgress && !votesRevealed
+			});
 			// State will be updated via the onStateUpdate callback
 		} catch (error) {
 			console.error('[Session] Error toggling observer mode:', error);
@@ -486,7 +489,7 @@
 		// Reset votes on server
 		if (sessionClient) {
 			try {
-				await sessionClient.resetVotes(sessionCode);
+				await sessionClient.resetVotes(sessionCode, playerName);
 			} catch (error) {
 				console.error('[Session] Error starting new voting:', error);
 			}
@@ -496,31 +499,17 @@
 	async function revealVotes() {
 		if (!isHost) return;
 
-		// Calculate average from current participants (exclude disconnected non-hosts)
-		const votes = participants
-			.filter(
-				(p) =>
-					!p.isObserver &&
-					(p.isHost || p.isConnected !== false) &&
-					p.vote &&
-					p.vote !== '?' &&
-					!isNaN(parseFloat(p.vote))
-			)
-			.map((p) => parseFloat(p.vote!));
-
-		let calculatedAverage = '';
-		if (votes.length > 0) {
-			const average = votes.reduce((sum, vote) => sum + vote, 0) / votes.length;
-			calculatedAverage = average.toFixed(1);
-		}
-
-		// Update server state
+		// The server calculates the average from persisted votes so reconnects and disconnects
+		// cannot cause the host's local state to drop a valid vote.
 		if (sessionClient) {
 			try {
-				await sessionClient.updateVotingState(sessionCode, {
-					votesRevealed: true,
-					voteAverage: calculatedAverage
-				});
+				await sessionClient.updateVotingState(
+					sessionCode,
+					{
+						votesRevealed: true
+					},
+					playerName
+				);
 			} catch (error) {
 				console.error('[Session] Error revealing votes:', error);
 			}
@@ -532,10 +521,14 @@
 
 		if (sessionClient) {
 			try {
-				await sessionClient.updateVotingState(sessionCode, {
-					finalEstimate: voteAverage,
-					votingInProgress: false
-				});
+				await sessionClient.updateVotingState(
+					sessionCode,
+					{
+						finalEstimate: voteAverage,
+						votingInProgress: false
+					},
+					playerName
+				);
 			} catch (error) {
 				console.error('[Session] Error accepting estimate:', error);
 			}
@@ -557,14 +550,15 @@
 					currentRoundDescription,
 					participants,
 					voteAverage,
-					finalEstimate || voteAverage
+					finalEstimate || voteAverage,
+					playerName
 				);
 				rounds = [...rounds, completedRound];
 			}
 
 			// Start new round
 			const newRoundNumber = currentRound + 1;
-			await roundService.startNewRound(sessionCode, newRoundNumber, description);
+			await roundService.startNewRound(sessionCode, newRoundNumber, description, playerName);
 
 			// Refresh session data after round operations
 			const updatedSession = await sessionClient.getSession(sessionCode);
@@ -604,7 +598,7 @@
 		if (tempTitle.trim()) {
 			if (sessionClient) {
 				try {
-					await sessionClient.updateSessionTitle(sessionCode, tempTitle.trim());
+					await sessionClient.updateSessionTitle(sessionCode, tempTitle.trim(), playerName);
 				} catch (error) {
 					console.error('[Session] Error saving title:', error);
 				}
@@ -723,7 +717,7 @@
 		if (!isHost || !participantToRemove || !sessionClient) return;
 
 		try {
-			await sessionClient.removeParticipant(sessionCode, participantToRemove);
+			await sessionClient.removeParticipant(sessionCode, participantToRemove, playerName);
 			console.log(`[Session] Removed participant: ${participantToRemove}`);
 		} catch (error) {
 			console.error('[Session] Error removing participant:', error);
@@ -810,7 +804,11 @@
 
 	<!-- Top Controls -->
 	<div class="fixed top-4 right-4 z-10 flex gap-2">
-		<ParticipantModeToggle {isObserver} onToggle={toggleObserverMode} />
+		<ParticipantModeToggle
+			{isObserver}
+			isActiveVoting={votingInProgress && !votesRevealed}
+			onToggle={toggleObserverMode}
+		/>
 		{#if isHost}
 			<Button
 				variant="outline"
@@ -904,10 +902,14 @@
 															const customValue = prompt('Enter custom estimate:', voteAverage);
 															if (customValue && customValue.trim() && sessionClient) {
 																try {
-																	await sessionClient.updateVotingState(sessionCode, {
-																		finalEstimate: customValue.trim(),
-																		votingInProgress: false
-																	});
+																	await sessionClient.updateVotingState(
+																		sessionCode,
+																		{
+																			finalEstimate: customValue.trim(),
+																			votingInProgress: false
+																		},
+																		playerName
+																	);
 																} catch (error) {
 																	console.error('[Session] Error saving custom estimate:', error);
 																}
@@ -936,10 +938,14 @@
 														onclick={async () => {
 															if (sessionClient) {
 																try {
-																	await sessionClient.updateVotingState(sessionCode, {
-																		finalEstimate: '',
-																		votingInProgress: false
-																	});
+																	await sessionClient.updateVotingState(
+																		sessionCode,
+																		{
+																			finalEstimate: '',
+																			votingInProgress: false
+																		},
+																		playerName
+																	);
 																} catch (error) {
 																	console.error('[Session] Error resetting final estimate:', error);
 																}
@@ -1059,7 +1065,7 @@
 													class="flex items-center rounded bg-gray-400 px-1 py-0.5 text-[8px] font-medium text-white sm:text-[9px]"
 													title="Disconnected"
 												>
-													⚫
+													<WifiOff class="h-2 w-2" />
 												</span>
 											{/if}
 										</div>
@@ -1067,20 +1073,7 @@
 
 									<!-- Vote Status Indicator -->
 									<div class="flex justify-center">
-										{#if participant.isConnected === false}
-											<div
-												class="flex items-center gap-1 rounded bg-gray-300 px-1.5 py-0.5 text-[9px] font-medium text-gray-700 sm:px-2 sm:py-1 sm:text-[10px]"
-											>
-												⚫ Offline
-											</div>
-										{:else if participant.isObserver}
-											<div
-												class="flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-medium text-orange-600 sm:px-2 sm:py-1 sm:text-[10px]"
-											>
-												<Eye class="h-3 w-3" />
-												Observer
-											</div>
-										{:else if votesRevealed && participant.vote}
+										{#if votesRevealed && participant.vote}
 											<div
 												class="bounce-in bg-poker-blue rounded px-2 py-0.5 text-xs font-bold text-white sm:px-2.5 sm:py-1 sm:text-sm"
 											>
@@ -1092,6 +1085,20 @@
 											>
 												<CheckCircle class="h-3 w-3" />
 												Voted
+											</div>
+										{:else if participant.isConnected === false}
+											<div
+												class="flex items-center gap-1 rounded bg-gray-300 px-1.5 py-0.5 text-[9px] font-medium text-gray-700 sm:px-2 sm:py-1 sm:text-[10px]"
+											>
+												<WifiOff class="h-3 w-3" />
+												Offline
+											</div>
+										{:else if participant.isObserver}
+											<div
+												class="flex items-center gap-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-medium text-orange-600 sm:px-2 sm:py-1 sm:text-[10px]"
+											>
+												<Eye class="h-3 w-3" />
+												Observer
 											</div>
 										{:else if votingInProgress}
 											<div
@@ -1173,7 +1180,7 @@
 									size="sm"
 									class="mt-1 text-xs"
 								>
-									Change Vote
+									Edit Vote
 								</Button>
 							</div>
 						{/if}

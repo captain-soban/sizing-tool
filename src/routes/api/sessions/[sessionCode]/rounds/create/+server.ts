@@ -10,6 +10,8 @@ export interface CreateRoundRequest {
 	completeCurrentRound?: boolean;
 	voteAverage?: string;
 	finalEstimate?: string;
+	hostUserId?: string;
+	hostPlayerName?: string;
 }
 
 // POST /api/sessions/[sessionCode]/rounds/create - Create a new voting round
@@ -21,8 +23,19 @@ export const POST: RequestHandler = async ({ request, params }) => {
 			newRoundDescription,
 			completeCurrentRound = false,
 			voteAverage,
-			finalEstimate
+			finalEstimate,
+			hostUserId,
+			hostPlayerName
 		}: CreateRoundRequest = await request.json();
+
+		const isHost = await PostgresSessionStore.isSessionHost(
+			sessionCode,
+			hostUserId,
+			hostPlayerName
+		);
+		if (!isHost) {
+			return json({ error: 'Host authorization required' }, { status: 403 });
+		}
 
 		// Get current session state
 		const currentSession = await PostgresSessionStore.getSession(sessionCode);

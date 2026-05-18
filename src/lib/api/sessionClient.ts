@@ -15,13 +15,20 @@ export class SessionClient {
 	private updateCallbacks: ((session: SessionData) => void)[] = [];
 
 	// Optimization: Batching and debouncing for participant updates
-	private pendingUpdates = new Map<string, Partial<Participant>>();
+	private pendingUpdates = new Map<
+		string,
+		{ sessionCode: string; playerName: string; updates: Partial<Participant> }
+	>();
 	private batchTimeout: NodeJS.Timeout | null = null;
 	private readonly BATCH_DELAY = 250; // ms - debounce participant updates
 	private readonly HEARTBEAT_INTERVAL = 30000; // ms - reduced from 60s to 30s
 
 	// Vote caching for immediate UI updates
 	private voteCache = new Map<string, { vote: string; timestamp: number }>();
+
+	private getParticipantKey(sessionCode: string, playerName: string): string {
+		return JSON.stringify([sessionCode, playerName]);
+	}
 
 	// Create new session
 	async createSession(
@@ -85,7 +92,7 @@ export class SessionClient {
 		updates: Partial<Participant>,
 		immediate = false
 	): Promise<SessionData | null> {
-		const key = `${sessionCode}-${playerName}`;
+		const key = this.getParticipantKey(sessionCode, playerName);
 
 		// For critical updates (observer mode, connection status), send immediately
 		if (immediate || updates.isObserver !== undefined || updates.isConnected !== undefined) {
@@ -93,12 +100,16 @@ export class SessionClient {
 		}
 
 		// For votes and heartbeats, use batching
-		const existing = this.pendingUpdates.get(key) || {};
-		this.pendingUpdates.set(key, { ...existing, ...updates });
+		const existing = this.pendingUpdates.get(key);
+		this.pendingUpdates.set(key, {
+			sessionCode,
+			playerName,
+			updates: { ...(existing?.updates || {}), ...updates }
+		});
 
 		// Cache votes for immediate UI feedback
-		if (updates.vote !== undefined) {
-			this.voteCache.set(`${sessionCode}-${playerName}`, {
+		if (typeof updates.vote === 'string') {
+			this.voteCache.set(key, {
 				vote: updates.vote,
 				timestamp: Date.now()
 			});
@@ -138,14 +149,16 @@ export class SessionClient {
 	private async flushPendingUpdates(): Promise<void> {
 		if (this.pendingUpdates.size === 0) return;
 
-		const updates = Array.from(this.pendingUpdates.entries());
+		const updates = Array.from(this.pendingUpdates.values());
 		this.pendingUpdates.clear();
 
 		// Send all batched updates in parallel
-		const promises = updates.map(([key, updateData]) => {
-			const [sessionCode, playerName] = key.split('-', 2);
-			return this.sendParticipantUpdate(sessionCode, playerName, updateData).catch((error) => {
-				console.error(`[SessionClient] Failed to send batched update for ${key}:`, error);
+		const promises = updates.map(({ sessionCode, playerName, updates }) => {
+			return this.sendParticipantUpdate(sessionCode, playerName, updates).catch((error) => {
+				console.error(
+					`[SessionClient] Failed to send batched update for ${sessionCode}/${playerName}:`,
+					error
+				);
 			});
 		});
 
@@ -153,11 +166,17 @@ export class SessionClient {
 	}
 
 	// Remove participant from session (host only)
-	async removeParticipant(sessionCode: string, playerName: string): Promise<SessionData> {
+	async removeParticipant(
+		sessionCode: string,
+		playerName: string,
+		hostPlayerName?: string
+	): Promise<SessionData> {
 		const response = await fetch(
 			`/api/sessions/${sessionCode}/participants/${encodeURIComponent(playerName)}`,
 			{
-				method: 'DELETE'
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ hostUserId: getUserId(), hostPlayerName })
 			}
 		);
 
@@ -172,12 +191,17 @@ export class SessionClient {
 	// Update voting state
 	async updateVotingState(
 		sessionCode: string,
-		votingState: Partial<VotingState>
+		votingState: Partial<VotingState>,
+		hostPlayerName?: string
 	): Promise<SessionData> {
 		const response = await fetch(`/api/sessions/${sessionCode}/voting`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(votingState)
+			body: JSON.stringify({
+				...votingState,
+				hostUserId: getUserId(),
+				hostPlayerName
+			})
 		});
 
 		if (!response.ok) {
@@ -189,9 +213,11 @@ export class SessionClient {
 	}
 
 	// Reset votes and start new voting round
-	async resetVotes(sessionCode: string): Promise<SessionData> {
+	async resetVotes(sessionCode: string, hostPlayerName?: string): Promise<SessionData> {
 		const response = await fetch(`/api/sessions/${sessionCode}/voting/reset`, {
-			method: 'POST'
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ hostUserId: getUserId(), hostPlayerName })
 		});
 
 		if (!response.ok) {
@@ -203,11 +229,15 @@ export class SessionClient {
 	}
 
 	// Update session title
-	async updateSessionTitle(sessionCode: string, title: string): Promise<SessionData> {
+	async updateSessionTitle(
+		sessionCode: string,
+		title: string,
+		hostPlayerName?: string
+	): Promise<SessionData> {
 		const response = await fetch(`/api/sessions/${sessionCode}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title })
+			body: JSON.stringify({ title, hostUserId: getUserId(), hostPlayerName })
 		});
 
 		if (!response.ok) {
@@ -221,12 +251,13 @@ export class SessionClient {
 	// Update story point scale
 	async updateStoryPointScale(
 		sessionCode: string,
-		storyPointScale: string[]
+		storyPointScale: string[],
+		hostPlayerName?: string
 	): Promise<SessionData> {
 		const response = await fetch(`/api/sessions/${sessionCode}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ storyPointScale })
+			body: JSON.stringify({ storyPointScale, hostUserId: getUserId(), hostPlayerName })
 		});
 
 		if (!response.ok) {
@@ -318,7 +349,7 @@ export class SessionClient {
 
 	// Get cached vote for immediate UI feedback
 	getCachedVote(sessionCode: string, playerName: string): string | undefined {
-		const cached = this.voteCache.get(`${sessionCode}-${playerName}`);
+		const cached = this.voteCache.get(this.getParticipantKey(sessionCode, playerName));
 		if (cached && Date.now() - cached.timestamp < 5000) {
 			// 5 second cache
 			return cached.vote;
@@ -346,7 +377,8 @@ export class SessionClient {
 		description: string,
 		votes: { [participantName: string]: string },
 		voteAverage: string,
-		finalEstimate: string
+		finalEstimate: string,
+		hostPlayerName?: string
 	): Promise<void> {
 		const response = await fetch(`/api/sessions/${sessionCode}/rounds`, {
 			method: 'POST',
@@ -356,7 +388,9 @@ export class SessionClient {
 				description,
 				votes,
 				voteAverage,
-				finalEstimate
+				finalEstimate,
+				hostUserId: getUserId(),
+				hostPlayerName
 			})
 		});
 

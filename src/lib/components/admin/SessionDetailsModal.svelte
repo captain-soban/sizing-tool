@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { X } from '@lucide/svelte';
+	import { Circle, Landmark, WifiOff, X } from '@lucide/svelte';
 	import type { AdminSessionData } from '$lib/api/adminClient';
 
 	interface Props {
@@ -162,16 +162,19 @@
 																class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800"
 															>
 																{#if participant.isHost}
-																	🏛️ Host (Always Online)
+																	<Landmark class="mr-1 h-3 w-3" />
+																	Host (Always Online)
 																{:else}
-																	🟢 Connected
+																	<Circle class="mr-1 h-3 w-3 fill-current" />
+																	Connected
 																{/if}
 															</span>
 														{:else}
 															<span
 																class="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800"
 															>
-																⚫ Disconnected
+																<WifiOff class="mr-1 h-3 w-3" />
+																Disconnected
 															</span>
 														{/if}
 													</td>
