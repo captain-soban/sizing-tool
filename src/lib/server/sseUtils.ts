@@ -78,7 +78,9 @@ export function getSessionConnectionStatus(
 
 		return {
 			...participant,
-			isConnected: isSseConnected && isRecentlySeen
+			// A recent database heartbeat is enough to avoid false offline states after refreshes,
+			// tab throttling, or broadcasts handled outside the process that owns the SSE stream.
+			isConnected: isSseConnected || isRecentlySeen
 		};
 	});
 }
