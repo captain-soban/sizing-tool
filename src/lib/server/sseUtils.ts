@@ -22,8 +22,10 @@ export function addParticipantConnection(
 	participantConnections.set(key, controller);
 	console.log(`[SSE] Added participant connection: ${key}`);
 
-	// Trigger batched session update
-	batchSessionUpdate(sessionCode);
+	// Reconnects should be visible right away to hosts waiting to reveal votes.
+	broadcastSessionUpdate(sessionCode).catch((error) => {
+		console.error(`[SSE] Error broadcasting participant reconnect for ${key}:`, error);
+	});
 }
 
 // Remove participant connection tracking

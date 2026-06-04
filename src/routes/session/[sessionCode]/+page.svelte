@@ -23,7 +23,7 @@
 		updateRecentSessionTitle,
 		addRecentSession
 	} from '$lib/stores/session';
-	import { SessionClient, type SessionData } from '$lib/api/sessionClient';
+	import { SessionClient, SessionClientError, type SessionData } from '$lib/api/sessionClient';
 	import {
 		BrainCog,
 		Share2,
@@ -449,23 +449,33 @@
 	async function selectVote(vote: string) {
 		if (isObserver) return; // Observers cannot vote
 
+		const previousSelectedVote = selectedVote;
+		const previousParticipants = participants;
+
 		// Immediate UI update for better UX
 		selectedVote = vote;
+		participants = participants.map((participant) =>
+			participant.name === playerName ? { ...participant, voted: true, vote } : participant
+		);
 
 		// Optimized server update - uses batching for better performance
 		if (sessionClient) {
 			try {
-				// Vote updates are batched and debounced (not immediate)
-				await sessionClient.updateParticipant(
+				const updatedSession = await sessionClient.updateParticipant(
 					sessionCode,
 					playerName,
 					{
 						voted: true,
 						vote: vote
 					},
-					false
-				); // false = use batching
+					true
+				);
+				if (updatedSession) {
+					updateFromSessionData(updatedSession);
+				}
 			} catch (error) {
+				selectedVote = previousSelectedVote;
+				participants = previousParticipants;
 				console.error('[Session] Error selecting vote:', error);
 			}
 		}
@@ -484,15 +494,39 @@
 	async function startNewVoting() {
 		if (!isHost) return;
 
-		// Clear local UI state
+		const previousSelectedVote = selectedVote;
+		const previousManDaysInput = manDaysInput;
+		const previousVotingInProgress = votingInProgress;
+		const previousVotesRevealed = votesRevealed;
+		const previousVoteAverage = voteAverage;
+		const previousFinalEstimate = finalEstimate;
+		const previousParticipants = participants;
+
 		selectedVote = null;
 		manDaysInput = '';
+		votingInProgress = true;
+		votesRevealed = false;
+		voteAverage = '';
+		finalEstimate = '';
+		participants = participants.map((participant) => ({
+			...participant,
+			voted: false,
+			vote: null
+		}));
 
 		// Reset votes on server
 		if (sessionClient) {
 			try {
-				await sessionClient.resetVotes(sessionCode, playerName);
+				const updatedSession = await sessionClient.resetVotes(sessionCode, playerName);
+				updateFromSessionData(updatedSession);
 			} catch (error) {
+				selectedVote = previousSelectedVote;
+				manDaysInput = previousManDaysInput;
+				votingInProgress = previousVotingInProgress;
+				votesRevealed = previousVotesRevealed;
+				voteAverage = previousVoteAverage;
+				finalEstimate = previousFinalEstimate;
+				participants = previousParticipants;
 				console.error('[Session] Error starting new voting:', error);
 			}
 		}
@@ -522,8 +556,12 @@
 				);
 				updateFromSessionData(updatedSession);
 			} catch (error) {
-				votesRevealed = previousVotesRevealed;
-				voteAverage = previousVoteAverage;
+				if (error instanceof SessionClientError && error.sessionData) {
+					updateFromSessionData(error.sessionData);
+				} else {
+					votesRevealed = previousVotesRevealed;
+					voteAverage = previousVoteAverage;
+				}
 				console.error('[Session] Error revealing votes:', error);
 			} finally {
 				isRevealingVotes = false;
@@ -1003,10 +1041,10 @@
 											<div class="flex flex-wrap justify-center gap-2">
 												<Button
 													onclick={revealVotes}
-													disabled={!allParticipantsVoted() || isRevealingVotes}
+													disabled={isRevealingVotes}
 													class={allParticipantsVoted() && !isRevealingVotes
 														? 'bg-poker-red hover:bg-poker-red/90'
-														: 'cursor-not-allowed bg-gray-400'}
+														: 'bg-poker-red/80 hover:bg-poker-red/90'}
 												>
 													<Theater class="mr-1 h-4 w-4" />
 													{isRevealingVotes ? 'Revealing...' : 'Reveal Votes'}

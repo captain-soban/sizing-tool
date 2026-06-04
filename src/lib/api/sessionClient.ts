@@ -10,6 +10,16 @@ export interface SessionData {
 	lastUpdated: string;
 }
 
+export class SessionClientError extends Error {
+	constructor(
+		message: string,
+		public sessionData?: SessionData
+	) {
+		super(message);
+		this.name = 'SessionClientError';
+	}
+}
+
 export class SessionClient {
 	private eventSource: EventSource | null = null;
 	private updateCallbacks: ((session: SessionData) => void)[] = [];
@@ -94,8 +104,15 @@ export class SessionClient {
 	): Promise<SessionData | null> {
 		const key = this.getParticipantKey(sessionCode, playerName);
 
-		// For critical updates (observer mode, connection status), send immediately
-		if (immediate || updates.isObserver !== undefined || updates.isConnected !== undefined) {
+		// For user-visible voting state, send immediately so hosts can reveal without waiting
+		// for the debounce window. Heartbeats still use batching unless explicitly requested.
+		if (
+			immediate ||
+			updates.isObserver !== undefined ||
+			updates.isConnected !== undefined ||
+			updates.voted !== undefined ||
+			'vote' in updates
+		) {
 			return this.sendParticipantUpdate(sessionCode, playerName, updates);
 		}
 
@@ -133,7 +150,7 @@ export class SessionClient {
 			{
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(updates)
+				body: JSON.stringify({ ...updates, userId: getUserId() })
 			}
 		);
 
@@ -206,7 +223,18 @@ export class SessionClient {
 
 		if (!response.ok) {
 			const error = await response.json();
-			throw new Error(error.error || 'Failed to update voting state');
+			const sessionData =
+				error.sessionCode && error.participants && error.votingState
+					? ({
+							sessionCode: error.sessionCode,
+							title: error.title,
+							participants: error.participants,
+							votingState: error.votingState,
+							storyPointScale: error.storyPointScale,
+							lastUpdated: error.lastUpdated
+						} satisfies SessionData)
+					: undefined;
+			throw new SessionClientError(error.error || 'Failed to update voting state', sessionData);
 		}
 
 		return response.json();

@@ -1,13 +1,26 @@
 import { json } from '@sveltejs/kit';
 import { PostgresSessionStore } from '$lib/server/postgresSessionStore';
-import { batchSessionUpdate } from '$lib/server/sseUtils';
+import { batchSessionUpdate, broadcastSessionUpdate } from '$lib/server/sseUtils';
 import type { RequestHandler } from './$types';
 
 // PATCH /api/sessions/[sessionCode]/participants/[playerName] - Update participant
 export const PATCH: RequestHandler = async ({ params, request }) => {
 	try {
 		const { sessionCode, playerName } = params;
-		const updates = await request.json();
+		const { userId, ...updates } = await request.json();
+
+		if (!userId || typeof userId !== 'string') {
+			return json({ error: 'Participant authorization required' }, { status: 403 });
+		}
+
+		const isParticipant = await PostgresSessionStore.isSessionParticipant(
+			sessionCode,
+			playerName,
+			userId
+		);
+		if (!isParticipant) {
+			return json({ error: 'Participant authorization required' }, { status: 403 });
+		}
 
 		const session = await PostgresSessionStore.updateParticipant(sessionCode, playerName, updates);
 
@@ -15,8 +28,15 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 			return json({ error: 'Session or participant not found' }, { status: 404 });
 		}
 
-		// Optimized: Use batched updates instead of immediate broadcast
-		batchSessionUpdate(sessionCode);
+		const shouldBroadcastImmediately =
+			updates.voted !== undefined || 'vote' in updates || updates.isObserver !== undefined;
+
+		if (shouldBroadcastImmediately) {
+			await broadcastSessionUpdate(sessionCode);
+		} else {
+			// Heartbeats and other background touches can stay batched.
+			batchSessionUpdate(sessionCode);
+		}
 
 		return json({
 			sessionCode: session.sessionCode,

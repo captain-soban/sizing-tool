@@ -415,6 +415,29 @@ export class PostgresSessionStore {
 		}
 	}
 
+	static async isSessionParticipant(
+		sessionCode: string,
+		playerName: string,
+		userId: string
+	): Promise<boolean> {
+		const pool = getPool();
+
+		try {
+			const participantResult = await pool.query(
+				`SELECT 1 FROM participants 
+				 WHERE session_code = $1
+				 AND name = $2
+				 AND user_id = $3`,
+				[sessionCode, playerName, userId]
+			);
+
+			return participantResult.rows.length > 0;
+		} catch (error) {
+			console.error(`[PostgresSessionStore] Error checking session participant:`, error);
+			return false;
+		}
+	}
+
 	static async updateSessionTitle(
 		sessionCode: string,
 		title: string

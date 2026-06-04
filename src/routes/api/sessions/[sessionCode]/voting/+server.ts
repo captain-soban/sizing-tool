@@ -29,6 +29,25 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 				currentSession.participants,
 				sessionCode
 			);
+			const votingParticipants = participantsWithConnectionStatus.filter(
+				(p) => !p.isObserver && (p.isConnected !== false || p.voted)
+			);
+
+			if (votingParticipants.length === 0 || votingParticipants.some((p) => !p.voted)) {
+				return json(
+					{
+						error: 'Not all voting participants have voted',
+						sessionCode: currentSession.sessionCode,
+						title: currentSession.title,
+						participants: participantsWithConnectionStatus,
+						votingState: currentSession.votingState,
+						storyPointScale: currentSession.storyPointScale,
+						lastUpdated: currentSession.lastUpdated
+					},
+					{ status: 409 }
+				);
+			}
+
 			const votes = participantsWithConnectionStatus
 				.filter(
 					(p) =>
