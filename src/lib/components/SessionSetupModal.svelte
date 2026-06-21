@@ -60,12 +60,6 @@
 			handleClose();
 		}
 	}
-
-	function handleBackdropClick(event: MouseEvent) {
-		if (event.target === event.currentTarget) {
-			handleClose();
-		}
-	}
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -74,8 +68,7 @@
 	<!-- Modal backdrop -->
 	<div
 		class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4"
-		onclick={handleBackdropClick}
-		onkeydown={(e) => e.key === 'Escape' && handleBackdropClick(e as unknown as MouseEvent)}
+		onkeydown={(e) => e.key === 'Escape' && handleClose()}
 		role="dialog"
 		aria-modal="true"
 		aria-labelledby="modal-title"

@@ -56,11 +56,11 @@
 			? 'Switching...'
 			: isActiveVoting
 				? isObserver
-					? 'Join Vote'
-					: 'Withdraw'
+					? 'Join as Voter'
+					: 'Observe This Round'
 				: isObserver
-					? 'Observer'
-					: 'Participant'
+					? 'Become Participant'
+					: 'Become Observer'
 	);
 
 	let toggleTitle = $derived(

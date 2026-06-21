@@ -1037,6 +1037,12 @@
 											showVotingProgress={true}
 											class="text-sm text-gray-600"
 										/>
+										{#if isObserver}
+											<div class="flex items-center justify-center gap-1.5 text-sm text-orange-600">
+												<Eye class="h-4 w-4" />
+												<span>Observing this round</span>
+											</div>
+										{/if}
 										{#if isHost}
 											<div class="flex flex-wrap justify-center gap-2">
 												<Button
@@ -1269,24 +1275,6 @@
 							{/each}
 						</div>
 					{/if}
-				</CardContent>
-			</Card>
-		</div>
-	{/if}
-
-	<!-- Observer Message (Bottom) -->
-	{#if votingInProgress && !votesRevealed && isObserver}
-		<div
-			class="fixed bottom-4 left-1/2 w-full max-w-2xl -translate-x-1/2 transform px-4 sm:bottom-8"
-		>
-			<Card class="work-area">
-				<CardContent class="p-4 sm:p-6">
-					<div
-						class="flex items-center justify-center gap-2 text-center text-sm text-orange-600 sm:text-base"
-					>
-						<Eye class="h-5 w-5" />
-						<p>You are observing this session. Toggle to participant mode to vote.</p>
-					</div>
 				</CardContent>
 			</Card>
 		</div>
